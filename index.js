@@ -1,13 +1,69 @@
 import express from 'express';
 import fetch from 'node-fetch';
 import { db } from "./firebaseConfig.js";
-import { doc, collection, setDoc, getDocs, query, where, Timestamp, serverTimestamp } from "firebase/firestore";
+import admin from 'firebase-admin';
+import { doc, getDoc, updateDoc, collection, setDoc, getDocs, query, arrayUnion, where, Timestamp, serverTimestamp } from "firebase/firestore";
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from './swagger.js';
 
 const app = express();
 app.use(express.json());
 
+
 // Notification
-app.post('/register-token', async (req, res) => {
+// Register push token and send a test notification
+/**
+ * @swagger
+ * /tokens/push:
+ *   post:
+ *     tags:
+ *       - Notifications
+ *     summary: Register push token and send test notification
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: Expo push notification token
+ *             required:
+ *               - token
+ *     responses:
+ *       200:
+ *         description: Test notification sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *       400:
+ *         description: Bad request - missing or invalid token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Missing push token"
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Failed to send push notification"
+ */
+app.post('/tokens/push', async (req, res) => {
   console.log('Received request to register token');
   const { token } = req.body;
   console.log('Received push token:', token);
@@ -33,7 +89,74 @@ app.post('/register-token', async (req, res) => {
   res.send({ success: true });
 });
 
-app.post('/test-notification', async (req, res) => {
+// Test notification endpoint
+/**
+ * @swagger
+ * /notifications/test:
+ *   post:
+ *     tags:
+ *       - Notifications
+ *     summary: Send test notification manually
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: Expo push notification token
+ *             required:
+ *               - token
+ *     responses:
+ *       200:
+ *         description: Test notification sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 result:
+ *                   type: object
+ *                   description: Response from Expo push service
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           status:
+ *                             type: string
+ *                             example: "ok"
+ *                           id:
+ *                             type: string
+ *                             example: "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+ *       400:
+ *         description: Bad request - missing push token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Missing push token"
+ *       500:
+ *         description: Internal server error - failed to send notification
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Failed to send push notification"
+ */
+app.post('/notifications/test', async (req, res) => {
   console.log('Received request to send test-notification');
   console.log('req.body =', req.body);
 
@@ -72,7 +195,72 @@ app.post('/test-notification', async (req, res) => {
   }
 });
 
-app.post('/due-notification', async (req, res) => {
+// Endpoint to send a notification when a task is due soon
+/**
+ * @swagger
+ * /notifications/due:
+ *   post:
+ *     tags:
+ *       - Notifications
+ *     summary: Send a due-task notification
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: Expo push notification token
+ *               until_due:
+ *                 type: integer
+ *                 description: Time until due in seconds
+ *                 example: 3600
+ *               task_name:
+ *                 type: string
+ *                 description: Name of the task that is due
+ *                 example: "Complete project report"
+ *             required:
+ *               - token
+ *               - until_due
+ *               - task_name
+ *     responses:
+ *       200:
+ *         description: Due task notification sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 result:
+ *                   type: object
+ *                   description: Response from Expo push service
+ *       400:
+ *         description: Bad request - missing required fields
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Missing push token"
+ *       500:
+ *         description: Internal server error - failed to send notification
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Failed to send push notification <due-notification>"
+ */
+app.post('/notifications/due', async (req, res) => {
   console.log('Received request to send test-notification');
 
   const { token, until_due, task_name } = req.body;
@@ -110,10 +298,80 @@ app.post('/due-notification', async (req, res) => {
   }
 });
 
+// TODO
+// app.post()
 
-// Create New Objects
-app.post('/user', async (req, res) => {
-  const { UserName } = req.body;
+// Create New 
+// Create a new user
+/**
+ * @swagger
+ * /users:
+ *   post:
+ *     tags:
+ *       - Users
+ *     summary: Create a new user
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               UserName:
+ *                 type: string
+ *                 description: Username for the new user
+ *                 example: "john_doe"
+ *               Password:
+ *                 type: string
+ *                 description: Password for the new user
+ *                 example: "j0hNn_dO3"
+ *             required:
+ *               - UserName
+ *               - Password
+ *     responses:
+ *       201:
+ *         description: User created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 UserID:
+ *                   type: string
+ *                   description: Auto-generated unique user ID
+ *                   example: "user_123456789"
+ *       400:
+ *         description: Bad request - missing UserName
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "UserName is required"
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: "Database connection failed"
+ */
+app.post('/users', async (req, res) => {
+  const { UserName, Password } = req.body;
 
   if (!UserName) {
     return res.status(400).json({ success: false, message: 'UserName is required' });
@@ -126,6 +384,8 @@ app.post('/user', async (req, res) => {
       const data = {
           UserID,
           UserName,
+          Password,
+          Arrange: 0
   };
   
   await setDoc(docRef, data);
@@ -137,18 +397,114 @@ app.post('/user', async (req, res) => {
   }
 });
 
-app.post('/task', async (req, res) => {
+// Create a new task 
+/**
+ * @swagger
+ * /tasks:
+ *   post:
+ *     tags:
+ *       - Tasks
+ *     summary: Create a new task
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               UserID:
+ *                 type: string
+ *                 description: ID of the user creating the task
+ *                 example: "user_123456789"
+ *               TaskName:
+ *                 type: string
+ *                 description: Name of the task
+ *                 example: "Complete project report"
+ *               TaskDetail:
+ *                 type: string
+ *                 description: Detailed description of the task
+ *                 example: "Write a comprehensive report on the project findings"
+ *               EndTime:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Due date and time for the task
+ *                 example: "2024-02-15T23:59:59.000Z"
+ *               Parent:
+ *                 type: string
+ *                 description: Parent task ID (default "NULL")
+ *                 example: "task_parent123"
+ *               Penalty:
+ *                 type: number
+ *                 description: Penalty score for late completion (default 0)
+ *                 example: 10
+ *               ExpectedTime:
+ *                 type: number
+ *                 description: Expected time to complete in minutes (default 60)
+ *                 example: 120
+ *               Member:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Array of member user IDs (defaults to [UserID])
+ *                 example: ["user_123456789", "user_987654321"]
+ *             required:
+ *               - UserID
+ *               - TaskName
+ *               - TaskDetail
+ *               - EndTime
+ *     responses:
+ *       201:
+ *         description: Task created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 TaskID:
+ *                   type: string
+ *                   description: Auto-generated unique task ID
+ *                   example: "task_123456789"
+ *       400:
+ *         description: Bad request - missing required fields
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "All fields are required"
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: "Database connection failed"
+ */
+app.post('/tasks', async (req, res) => {
   const { 
     UserID,
     TaskName,
     TaskDetail,
     EndTime, 
-    Child,
-    Parent,
-    Penalty,
-    ExpectedTime,
-    Member
+    Parent = "NULL",
+    Penalty = 0,
+    ExpectedTime = 60,
   } = req.body;
+  
   if (!UserID || !TaskName || !TaskDetail || !EndTime) {
       return res.status(400).json({ success: false, message: 'All fields are required' });
   }
@@ -159,7 +515,8 @@ app.post('/task', async (req, res) => {
       const State = "On";
   
       const finalMember = Member ?? [UserID]; // 如果沒提供 Member，就預設為 [UserID]
-
+      
+      const Child = [];
       const data = {
           TaskID,
           UserID,
@@ -172,72 +529,87 @@ app.post('/task', async (req, res) => {
           Parent,
           Penalty,
           ExpectedTime,
-          Member: finalMember
-      };
+          Member: finalMember,
+          UnfinishedMember: finalMember,
+    };
       
       await setDoc(docRef, data);
       
-      return res.status(201).json({ success: true, id: TaskID });
+      if (Parent !== "NULL") {
+        const parentRef = doc(db, "Task", Parent);
+        await updateDoc(parentRef, {
+          Child: arrayUnion(TaskID),
+        });
+      }
+
+      return res.status(201).json({ success: true, TaskID: TaskID });
     } catch (error) {
         console.error('Error adding task:', error);
         return res.status(500).json({ success: false, error: error.message });
   }  
 });
 
-app.post('/meeting', async (req, res) => {
-  const { TaskID, MeetingName, MeetingDetail, StartTime, Duration } = req.body;
-  if (!TaskID || !MeetingName || !MeetingDetail || !StartTime || !Duration) {
-      return res.status(400).json({ success: false, message: 'All fields are required' });
-  }
-
-  try{
-      const docRef = doc(collection(db, "Meeting"));
-      const MeetingID = docRef.id;
-  
-      const data = {
-          MeetingID,
-          TaskID,
-          MeetingName,
-          MeetingDetail,
-          StartTime: Timestamp.fromDate(new StartTime),
-          Duration,
-      };
-      
-      await setDoc(docRef, data);
-      
-      return res.status(201).json({ success: true, id: MeetingID });
-    } catch (error) {
-        console.error('Error adding meeting:', error);
-        return res.status(500).json({ success: false, error: error.message });
-  }  
-});
-
-// Add user to a group (task.Member)
-app.post('/group', async (req, res) => {
-  const { UserID, TaskID } = req.body;
-  if (!UserID || !TaskID ) {
-      return res.status(400).json({ success: false, message: 'All fields are required' });
-  }
-
-  try {
-    const taskRef = db.collection('Task').doc(TaskID);
-
-    // Update Member array: add only if not already present
-    await taskRef.update({
-      Member: admin.firestore.FieldValue.arrayUnion(UserID),
-    });
-
-    return res.status(200).json({ success: true, message: `User ${UserID} added to Task ${TaskID}` });
-    } catch (error) {
-        console.error('Error adding group:', error);
-        return res.status(500).json({ success: false, error: error.message });
-  }  
-});
 
 // User-related APIs
-
-// 用username找id
-app.get('/user-id/:username', async (req, res) => {
+// get user ID by username
+/**
+ * @swagger
+ * /users/by-username/{username}:
+ *   get:
+ *     tags:
+ *       - Users
+ *     summary: Get user ID by username
+ *     parameters:
+ *       - in: path
+ *         name: username
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Username to search for
+ *         example: "john_doe"
+ *     responses:
+ *       200:
+ *         description: UserID found successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 UserID:
+ *                   type: string
+ *                   description: The user's unique ID
+ *                   example: "user_123456789"
+ *       404:
+ *         description: User not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "User john_doe Not Found."
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: "Database query failed"
+ */
+app.get('/users/by-username/:username', async (req, res) => {
   try {
     const userName = req.params.username;
 
@@ -261,15 +633,90 @@ app.get('/user-id/:username', async (req, res) => {
   }
 });
 
-// 依據UserID獲取task
-app.get('/user-tasks/:userID', async (req, res) => {
+// Get user root tasks by UserID
+/**
+ * @swagger
+ * /users/{userID}/tasks/root:
+ *   get:
+ *     tags:
+ *       - Users
+ *       - Tasks
+ *     summary: Get root tasks for a user
+ *     parameters:
+ *       - in: path
+ *         name: userID
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User's unique ID
+ *         example: "user_123456789"
+ *     responses:
+ *       200:
+ *         description: List of root tasks retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 tasks:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       TaskID:
+ *                         type: string
+ *                         example: "task_123456789"
+ *                       UserID:
+ *                         type: string
+ *                         example: "user_123456789"
+ *                       TaskName:
+ *                         type: string
+ *                         example: "Complete project"
+ *                       TaskDetail:
+ *                         type: string
+ *                         example: "Finish the final project for CS course"
+ *                       CreatedTime:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2024-01-15T10:30:00.000Z"
+ *                       EndTime:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2024-02-15T23:59:59.000Z"
+ *                       State:
+ *                         type: string
+ *                         example: "On"
+ *                       Member:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                         example: ["user_123456789", "user_987654321"]
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: "Database query failed"
+ */
+app.get('/users/:userID/tasks/root', async (req, res) => {
   try {
     const userID = req.params.userID;
 
     const q = query(
         collection(db, "Task"),
-        where("Member", "array-contains", userID),
-        where("State", "==", "On")
+        where("UnfinishedMember", "array-contains", userID),
+        where("State", "==", "On"),
+        where("Parent", "==", "NULL")
     );
 
     const snapshot = await getDocs(q);
@@ -295,8 +742,468 @@ app.get('/user-tasks/:userID', async (req, res) => {
   }
 });
 
-// 依據UserID獲取meeting
-app.get('/user-meetings/:userID', async (req, res) => {
+// Get user leaf tasks by UserID
+/**
+ * @swagger
+ * /users/{userID}/tasks/leaf:
+ *   get:
+ *     tags:
+ *       - Users
+ *       - Tasks
+ *     summary: Get leaf tasks for a user
+ *     parameters:
+ *       - in: path
+ *         name: userID
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User's unique ID
+ *         example: "user_123456789"
+ *     responses:
+ *       200:
+ *         description: List of leaf tasks retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 tasks:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       TaskID:
+ *                         type: string
+ *                         example: "task_123456789"
+ *                       UserID:
+ *                         type: string
+ *                         example: "user_123456789"
+ *                       TaskName:
+ *                         type: string
+ *                         example: "Write introduction"
+ *                       TaskDetail:
+ *                         type: string
+ *                         example: "Write the introduction section of the report"
+ *                       CreatedTime:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2024-01-15T10:30:00.000Z"
+ *                       EndTime:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2024-02-15T23:59:59.000Z"
+ *                       State:
+ *                         type: string
+ *                         example: "On"
+ *                       Member:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                         example: ["user_123456789"]
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: "Database query failed"
+ */
+app.get('/users/:userID/tasks/leaf', async (req, res) => {
+  try {
+    const userID = req.params.userID;
+
+    const q = query(
+        collection(db, "Task"),
+        where("UnfinishedMember", "array-contains", userID),
+        where("State", "==", "On"),
+    );
+
+    const snapshot = await getDocs(q);
+    const tasks = snapshot.docs;
+
+    const filteredTasks = [];
+
+    for (const taskDoc of tasks) {
+        const data = taskDoc.data();
+        const childIDs = data.Child || [];
+
+        // ✅ child 為空或未定義，直接保留
+        if (!childIDs || childIDs.length === 0) {
+            filteredTasks.push({
+                TaskID: data.TaskID,
+                UserID: userID,
+                TaskName: data.TaskName,
+                TaskDetail: data.TaskDetail,
+                CreatedTime: data.CreatedTime.toDate(),
+                EndTime: data.EndTime.toDate(),
+                State: data.State,
+                Member: data.Member
+            });
+            console.log(`Task ${data.TaskID} has no children, keeping it.`);
+            continue; // 跳過後面的 child 檢查
+        }
+
+        // 否則檢查 child 任務中是否包含該使用者
+        const childDocs = await Promise.all(
+            childIDs.map(id => getDoc(doc(db, "Task", id)))
+        );
+
+        const childHasUser = childDocs.some(childDoc => {
+            const childData = childDoc.data();
+            return childData?.Member?.includes(userID);
+        });
+
+        if (!childHasUser) {
+            filteredTasks.push({
+                TaskID: data.TaskID,
+                UserID: userID,
+                TaskName: data.TaskName,
+                TaskDetail: data.TaskDetail,
+                CreatedTime: data.CreatedTime.toDate(),
+                EndTime: data.EndTime.toDate(),
+                State: data.State,
+                Member: data.Member
+            });
+            console.log(`Task ${data.TaskID} has no children with user ${userID}, keeping it.`);
+        }
+    }
+
+    return res.json({ success: true, tasks: filteredTasks});
+
+  } catch (error) {
+    console.error('Error fetching user tasks:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get user finished root tasks by UserID
+/**
+ * @swagger
+ * /users/{userID}/tasks/finished-root:
+ *   get:
+ *     tags:
+ *       - Users
+ *       - Tasks
+ *     summary: Get finished root tasks for a user
+ *     parameters:
+ *       - in: path
+ *         name: userID
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User's unique ID
+ *         example: "user_123456789"
+ *     responses:
+ *       200:
+ *         description: List of finished root tasks retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 tasks:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       TaskID:
+ *                         type: string
+ *                         example: "task_123456789"
+ *                       UserID:
+ *                         type: string
+ *                         example: "user_123456789"
+ *                       TaskName:
+ *                         type: string
+ *                         example: "Completed project"
+ *                       TaskDetail:
+ *                         type: string
+ *                         example: "Successfully completed final project"
+ *                       CreatedTime:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2024-01-15T10:30:00.000Z"
+ *                       EndTime:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2024-02-15T23:59:59.000Z"
+ *                       State:
+ *                         type: string
+ *                         example: "On"
+ *                       Member:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                         example: ["user_123456789", "user_987654321"]
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: "Database query failed"
+ */
+app.get('/users/:userID/tasks/finished-root', async (req, res) => {
+  try {
+    const userID = req.params.userID;
+
+    const q = query(
+        collection(db, "Task"),
+        where("Member", "array-contains", userID),
+        where("Unfinished", "!array-contains", userID),
+        where("State", "==", "On"),
+        where("Parent", "==", "NULL")
+    );
+
+    const snapshot = await getDocs(q);
+    const taskList = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        TaskID: data.TaskID,
+        UserID: userID,
+        TaskName: data.TaskName,
+        TaskDetail: data.TaskDetail,
+        CreatedTime: data.CreatedTime?.toDate?.() ?? null,
+        EndTime: data.EndTime?.toDate?.() ?? null,
+        State: data.State,
+        Member: data.Member,
+      };
+    });
+
+    return res.json({ success: true, tasks: taskList });
+
+  } catch (error) {
+    console.error('Error fetching user tasks:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get user finished leaf tasks by UserID
+/**
+ * @swagger
+ * /users/{userID}/tasks/finished-leaf:
+ *   get:
+ *     tags:
+ *       - Users
+ *       - Tasks
+ *     summary: Get finished leaf tasks for a user
+ *     parameters:
+ *       - in: path
+ *         name: userID
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User's unique ID
+ *         example: "user_123456789"
+ *     responses:
+ *       200:
+ *         description: List of finished leaf tasks retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 tasks:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       TaskID:
+ *                         type: string
+ *                         example: "task_123456789"
+ *                       UserID:
+ *                         type: string
+ *                         example: "user_123456789"
+ *                       TaskName:
+ *                         type: string
+ *                         example: "Completed introduction"
+ *                       TaskDetail:
+ *                         type: string
+ *                         example: "Successfully wrote introduction section"
+ *                       CreatedTime:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2024-01-15T10:30:00.000Z"
+ *                       EndTime:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2024-02-15T23:59:59.000Z"
+ *                       State:
+ *                         type: string
+ *                         example: "On"
+ *                       Member:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                         example: ["user_123456789"]
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: "Database query failed"
+ */
+app.get('/users/:userID/tasks/finished-leaf', async (req, res) => {
+  try {
+    const userID = req.params.userID;
+
+    const q = query(
+        collection(db, "Task"),
+        where("Member", "array-contains", userID),
+        where("UnfinishedMember", "!array-contains", userID),
+        where("State", "==", "On"),
+    );
+
+    const snapshot = await getDocs(q);
+    const tasks = snapshot.docs;
+
+    const filteredTasks = [];
+
+    for (const taskDoc of tasks) {
+        const data = taskDoc.data();
+        const childIDs = data.child || [];
+
+        // ✅ child 為空或未定義，直接保留
+        if (!childIDs || childIDs.length === 0) {
+            filteredTasks.push({
+                TaskID: data.TaskID,
+                UserID: userID,
+                TaskName: data.TaskName,
+                TaskDetail: data.TaskDetail,
+                CreatedTime: data.CreatedTime.toDate(),
+                EndTime: data.EndTime.toDate(),
+                State: data.State,
+                Member: data.Member
+            });
+            continue; // 跳過後面的 child 檢查
+        }
+
+        // 否則檢查 child 任務中是否包含該使用者
+        const childDocs = await Promise.all(
+            childIDs.map(id => getDoc(doc(db, "Task", id)))
+        );
+
+        const childHasUser = childDocs.some(childDoc => {
+            const childData = childDoc.data();
+            return childData?.Member?.includes(userID);
+        });
+
+        if (!childHasUser) {
+            filteredTasks.push({
+                TaskID: data.TaskID,
+                UserID: userID,
+                TaskName: data.TaskName,
+                TaskDetail: data.TaskDetail,
+                CreatedTime: data.CreatedTime.toDate(),
+                EndTime: data.EndTime.toDate(),
+                State: data.State,
+                Member: data.Member
+            });
+        }
+    }
+
+    return res.json({ success: true, tasks: filteredTasks});
+
+  } catch (error) {
+    console.error('Error fetching user tasks:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get user meetings by UserID
+/**
+ * @swagger
+ * /users/{userID}/meetings:
+ *   get:
+ *     tags:
+ *       - Users
+ *     summary: Get meetings for a user
+ *     parameters:
+ *       - in: path
+ *         name: userID
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User's unique ID
+ *         example: "user_123456789"
+ *     responses:
+ *       200:
+ *         description: List of meetings retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 meetings:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       TaskID:
+ *                         type: string
+ *                         example: "task_123456789"
+ *                       MeetingID:
+ *                         type: string
+ *                         example: "meeting_123456789"
+ *                       MeetingName:
+ *                         type: string
+ *                         example: "Project kickoff meeting"
+ *                       MeetingDetail:
+ *                         type: string
+ *                         example: "Initial meeting to discuss project requirements"
+ *                       StartTime:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2024-01-20T14:00:00.000Z"
+ *                       Duration:
+ *                         type: number
+ *                         description: Duration in minutes
+ *                         example: 60
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: "Database query failed"
+ */
+app.get('/users/:userID/meetings', async (req, res) => {
   try {
     const userID = req.params.userID;
 
@@ -347,7 +1254,511 @@ app.get('/user-meetings/:userID', async (req, res) => {
   }
 });
 
+// Task-related APIs
+// Mark a task as finished by changing itself all its children's UnfinishedMember array
+/**
+ * @swagger
+ * /tasks/{taskID}/finish:
+ *   post:
+ *     tags:
+ *       - Tasks
+ *     summary: Mark task and its children as finished for a user
+ *     parameters:
+ *       - in: path
+ *         name: taskID
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Task ID to mark as finished
+ *         example: "task_123456789"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               TaskID:
+ *                 type: string
+ *                 description: Task ID to mark as finished
+ *                 example: "task_123456789"
+ *               UserID:
+ *                 type: string
+ *                 description: User ID who completed the task
+ *                 example: "user_123456789"
+ *             required:
+ *               - TaskID
+ *               - UserID
+ *     responses:
+ *       200:
+ *         description: Task marked as finished successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "user_123456789 marked as finished in task_123456789 and its children"
+ *       400:
+ *         description: Bad request - missing required fields
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "TaskID and UserID are required"
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: "Database update failed"
+ */
+app.post('/tasks/:taskID/finish', async (req, res) => {
+  const { TaskID, UserID } = req.body;
 
-app.listen(3000, '0.0.0.0', () => {
-  console.log('🚀 Backend running on http://0.0.0.0:3000');
+  if (!TaskID || !UserID) {
+    return res.status(400).json({ success: false, message: 'TaskID and UserID are required' });
+  }
+
+  try {
+    // Helper function: recursively update task and children
+    const removeUserRecursively = async (taskID) => {
+      const taskRef = db.collection("Task").doc(taskID);
+      const taskSnap = await taskRef.get();
+
+      if (!taskSnap.exists) return;
+
+      const taskData = taskSnap.data();
+      const unfinishedMembers = taskData.UnfinishedMember || [];
+
+      // If user not in this task, no need to update or go deeper
+      if (!unfinishedMembers.includes(UserID)) return;
+
+      // Remove the user
+      await taskRef.update({
+        UnfinishedMember: admin.firestore.FieldValue.arrayRemove(UserID),
+      });
+
+      // Recurse into child tasks if they exist
+      const children = taskData.Child || [];
+      for (const childID of children) {
+        await removeUserRecursively(childID);
+      }
+    };
+
+    // Start the process from the root task
+    await removeUserRecursively(TaskID);
+
+    return res.status(200).json({ success: true, message: `${UserID} marked as finished in ${TaskID} and its children` });
+  } catch (error) {
+    console.error("Error marking task finished:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Delete a task by changing it state to "Deleted"
+/**
+ * @swagger
+ * /tasks/{taskID}/delete:
+ *   post:
+ *     tags:
+ *       - Tasks
+ *     summary: Delete task and its children
+ *     parameters:
+ *       - in: path
+ *         name: taskID
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Task ID to delete
+ *         example: "task_123456789"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               TaskID:
+ *                 type: string
+ *                 description: Task ID to delete
+ *                 example: "task_123456789"
+ *             required:
+ *               - TaskID
+ *     responses:
+ *       200:
+ *         description: Task marked as deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Deleted task_123456789 and its children"
+ *       400:
+ *         description: Bad request - missing TaskID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "TaskID and UserID are required"
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: "Database update failed"
+ */
+app.post('/tasks/:taskID/delete', async (req, res) => {
+  const { TaskID } = req.body;
+
+  if (!TaskID ) {
+    return res.status(400).json({ success: false, message: 'TaskID and UserID are required' });
+  }
+
+  try {
+    // Helper function: recursively update task and children
+    const removeUserRecursively = async (taskID) => {
+      const taskRef = db.collection("Task").doc(taskID);
+      const taskSnap = await taskRef.get();
+
+      if (!taskSnap.exists) return;
+
+      const taskData = taskSnap.data();
+
+      // Remove the user
+      await taskRef.update({
+        State: "Deleted",
+      });
+
+      // Recurse into child tasks if they exist
+      const children = taskData.Child || [];
+      for (const childID of children) {
+        await removeUserRecursively(childID);
+      }
+    };
+
+    // Start the process from the root task
+    await removeUserRecursively(TaskID);
+
+    return res.status(200).json({ success: true, message: `Deleted ${TaskID} and its children` });
+  } catch (error) {
+    console.error("Error marking task finished:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Add user to a task 
+/**
+ * @swagger
+ * /tasks/{taskID}/members:
+ *   post:
+ *     tags:
+ *       - Tasks
+ *     summary: Add user to a task and its ancestors
+ *     parameters:
+ *       - in: path
+ *         name: taskID
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Task ID to add user to
+ *         example: "task_123456789"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               UserID:
+ *                 type: string
+ *                 description: User ID to add to the task
+ *                 example: "user_123456789"
+ *             required:
+ *               - UserID
+ *     responses:
+ *       200:
+ *         description: User added to task and ancestors successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "User user_123456789 added to Task task_123456789 and all ancestors."
+ *       400:
+ *         description: Bad request - missing required fields
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "UserID and TaskID are required"
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: "Database update failed"
+ */
+app.post('/tasks/:taskID/members', async (req, res) => {
+  const { UserID } = req.body;
+  const { taskID } = req.params;
+
+  if (!UserID ) {
+    return res.status(400).json({ success: false, message: 'UserID are required' });
+  }
+
+  try {
+    // Recursive function to walk up parent chain and update Member + UnfinishedMember
+    const updateTaskAndAncestors = async (taskID) => {
+      const taskRef = doc(db, 'Task', taskID);
+      const taskSnap = await getDoc(taskRef)
+      
+      if (!taskSnap.exists) return;
+
+      const taskData = taskSnap.data();
+
+      // Update Member and UnfinishedMember arrays
+      await updateDoc(taskRef, {
+        Member: arrayUnion(UserID),
+        UnfinishedMember: arrayUnion(UserID),
+      });
+
+      const parentID = taskData.Parent;
+      // Recursively update parent if it exists and is not "NULL"
+      if (parentID && parentID !== "NULL") {
+        await updateTaskAndAncestors(parentID);
+      }
+    };
+
+    // Start from the given task
+    await updateTaskAndAncestors(taskID);
+
+    return res.status(200).json({
+      success: true,
+      message: `User ${UserID} added to Task ${taskID} and all ancestors.`,
+    });
+  } catch (error) {
+    console.error('Error adding user to task:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
+// Scheduleing-related APIs
+
+// Scheudle tasks
+/**
+ * @swagger
+ * /users/{userID}/schedule:
+ *   get:
+ *     tags:
+ *       - Scheduling
+ *     summary: Generate schedule for a user
+ *     parameters:
+ *       - in: path
+ *         name: userID
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Computed schedule
+ */
+app.get('/users/:userID/schedule', async (req, res) => {
+  const { userID, algID } = req.body;
+  
+  try {
+        const q = query(
+            collection(db, "Task"),
+            where("Member", "array-contains", userID),
+            where("State", "==", "On")
+        );
+
+        const snapshot = await getDocs(q);
+        const expectedTime = [];
+        const penalty = [];
+        const endTimes = [];
+        const taskNames = [];
+
+        let alg;
+        alg = algID; //選擇使用的演算法 1:GA 2:GA_2(總成本更低但更慢) 3:endTimes 4:penalty 5:expectedtime
+
+        const taskList = snapshot.docs
+            .map(doc => {
+                const data = doc.data();
+                return {
+                    TaskName: data.TaskName,
+                    EndTime: data.EndTime.toDate(),
+                    Penalty: data.Penalty,
+                    ExpectedTime: data.ExpectedTime,
+                    Child:  data.Child,
+                    Parent: data.Parent,
+                    TaskID: data.TaskID,
+                    UserID: userID,
+                    TaskDetail: data.TaskDetail,
+                    CreatedTime: data.CreatedTime.toDate(),
+                    State: data.State,
+                    Member: data.Member
+                };
+            })
+            .filter(task => task.Child.length == 0);
+
+        const now = new Date();
+        //可能需要考慮一天有多少時間可以寫功課?
+        for (var i = 0; i < taskList.length; i++) {
+            expectedTime.push(taskList[i].ExpectedTime),
+            penalty.push(taskList[i].Penalty),
+            endTimes.push((taskList[i].EndTime.getTime() - now.getTime()) / 1000), // 單位為秒 
+            taskNames.push(taskList[i].TaskName)
+        };
+        const result = await callSchedule(expectedTime, penalty, endTimes, taskNames, alg);
+
+        return res.json({ success: true, result: result });
+
+    } catch (error) {
+      console.error('Error scheduling tasks:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Call python function
+/**
+ * @swagger
+ * /schedule/compute:
+ *   get:
+ *     tags:
+ *       - Scheduling
+ *     summary: Run external Python-based scheduler
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               expectedTime:
+ *                 type: array
+ *                 items:
+ *                   type: number
+ *               penalty:
+ *                 type: array
+ *                 items:
+ *                   type: number
+ *               endTimes:
+ *                 type: array
+ *                 items:
+ *                   type: number
+ *               taskNames:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               alg:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Computed schedule from Python
+ */
+app.get('/schedule/compute', async (req, res) => {
+  const { expectedTime, penalty, endTimes, taskNames, alg } = req.body;
+
+  const input = JSON.stringify({
+      expectedTime,
+      penalty,
+      endTimes,
+      taskNames,
+      alg
+  });
+  const python = spawn("python", ["scheduling.py"]);
+
+  let output = "";
+  let errorOutput = "";
+
+  python.stdout.on("data", (data) => {
+      output += data.toString();
+  });
+
+  python.stderr.on("data", (data) => {
+      errorOutput += data.toString();
+  });
+
+  python.stdin.write(input);
+  python.stdin.end();
+
+  python.on("close", (code) => {
+      if (code !== 0) {
+          console.error("Python script error:", errorOutput);
+          return res.status(500).json({ success: false, error: errorOutput });
+      }  
+      try {
+        const parsed = JSON.parse(output);
+        return res.status(200).json({ success: true, result: parsed });
+      } catch (err) {
+          console.error("無法解析 Python 輸出：", output);
+          return res.status(500).json({ success: false, error: 'Invalid output from Python script' });
+      }
+    });
+});
+
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+// app.listen(3000, '0.0.0.0', () => {
+//   console.log('🚀 Backend running on http://0.0.0.0:3000');
+// });
+
+app.listen(3000, '127.0.0.1', () => {
+  console.log('🚀 Backend running on http://127.0.0.1:3000');
+  console.log('📚 Swagger docs at http://localhost:3000/api-docs');
 });
