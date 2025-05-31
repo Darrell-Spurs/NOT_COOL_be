@@ -5,6 +5,7 @@ import admin from 'firebase-admin';
 import { doc, getDoc, updateDoc, collection, setDoc, getDocs, query, arrayUnion, where, Timestamp, serverTimestamp } from "firebase/firestore";
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './swagger.js';
+import { spawn } from "child_process";
 
 const app = express();
 app.use(express.json());
@@ -1602,39 +1603,19 @@ app.post('/tasks/:taskID/members', async (req, res) => {
 /**
  * @swagger
  * /users/{userID}/schedule:
- *   get:
- *     tags:
- *       - Scheduling
- *     summary: Generate schedule for a user
- *     description: |
- *       Retrieves all leaf tasks assigned to a user and computes a task schedule based on the specified algorithm.
- *       Supported algorithms:
- *       - 1: Genetic Algorithm (fast)
- *       - 2: Genetic Algorithm 2 (slower, lower cost)
- *       - 3: Earliest Deadline First
- *       - 4: Highest Penalty First
- *       - 5: Shortest Expected Time First
- *     parameters:
- *       - in: path
- *         name: userID
+	@@ -1613,72 +1613,157 @@ app.post('/tasks/:taskID/members', async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID of the user to schedule tasks for
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - algID
- *             properties:
- *               algID:
- *                 type: integer
- *                 enum: [1, 2, 3, 4, 5]
- *                 description: Algorithm ID used for scheduling
- *                 example: 1
+ *         description: User's unique ID
+ *         example: "user_123456789"
+ *       - in: query
+ *         name: alg
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Algorithm ID (1:J人排序,2:P人排序,3:endTimes,4:penalty,5:expectedTime)
+ *         example: 1
  *     responses:
  *       200:
  *         description: Computed schedule
@@ -1650,31 +1631,83 @@ app.post('/tasks/:taskID/members', async (req, res) => {
  *                   type: array
  *                   items:
  *                     type: object
- *                     properties:
- *                       TaskName:
- *                         type: string
- *                         example: "Finish Report"
- *                       StartTime:
- *                         type: string
- *                         format: date-time
- *                       Duration:
- *                         type: number
- *                         example: 3600
+ *                   description: Schedule result from Python script
  *       500:
- *         description: Server error during scheduling
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: "Failed to fetch leaf tasks"
  */
 app.get('/users/:userID/schedule', async (req, res) => {
-  const { algID } = req.body;
-  const { userID } = req.params;
-  
-  try {
+    try {
+        const userID = req.params.userID;
+        const alg = parseInt(req.query.alg) || 1; // Default to 1 
+        //alg  scheduling 1:J人排序 2:P人排序
+        //     基本排序    3:endTimes(作業截止時間越早越前面) 4:penalty(越重要越前面) 5:expectedtime(作業需要花費時間越短越前面)
+
         const q = query(
-            collection(db, "Task"),
-            where("Member", "array-contains", userID),
-            where("State", "==", "On")
+          collection(db, "Task"),
+          where("UnfinishedMember", "array-contains", userID),
+          where("State", "==", "On"),
         );
 
         const snapshot = await getDocs(q);
+        const tasks = snapshot.docs;
+
+        const filteredTasks = [];
+
+        for (const taskDoc of tasks) {
+          const data = taskDoc.data();
+          const childIDs = data.Child || [];
+
+          // ✅ child 為空或未定義，直接保留
+          if (!childIDs || childIDs.length === 0) {
+            filteredTasks.push({
+              TaskID: data.TaskID,
+              UserID: userID,
+              Penalty: data.Penalty,
+              ExpectedTime: data.ExpectedTime,
+              EndTime: data.EndTime.toDate()
+            });
+            console.log(`Task ${data.TaskID} has no children, keeping it.`);
+            continue; // 跳過後面的 child 檢查
+          }
+
+          // 否則檢查 child 任務中是否包含該使用者
+          const childDocs = await Promise.all(
+            childIDs.map(id => getDoc(doc(db, "Task", id)))
+          );
+
+          const childHasUser = childDocs.some(childDoc => {
+            const childData = childDoc.data();
+            return childData?.Member?.includes(userID);
+          });
+
+          if (!childHasUser) {
+            filteredTasks.push({
+              TaskID: data.TaskID,
+              UserID: userID,
+              Penalty: data.Penalty,
+              ExpectedTime: data.ExpectedTime,
+              EndTime: data.EndTime.toDate()
+            });
+            console.log(`Task ${data.TaskID} has no children with user ${userID}, keeping it.`);
+          }
+        }
+
+        if (filteredTasks.length === 0) {
+        return res.json({ success: true, result: [] });
+        }
+
+        // Step 2: Process tasks to extract required fields
         const expectedTime = [];
         const penalty = [];
         const endTimes = [];

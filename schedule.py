@@ -38,14 +38,13 @@ def GA(P,D,C,pop_size=50, generations=500, cxr=0.8, mutr=0.2):
     generations 為運算次數  
     cxr 為交叉機率  
     mutr 為變異機率  
-
     此函式會回傳作業完成的順序  
     '''
     if not (len(P) == len(D) == len(C)):
         raise ValueError("參數 P, D, C 的長度必須相同")
     elif len(P) == 0:
         raise ValueError("參數 P, D, C的長度必須大於零")
-    
+
     N = len(P)
     pop = [random.sample(range(N), N) for _ in range(pop_size)]
     for gen in range(generations):
@@ -68,7 +67,7 @@ def RANDOM(P,D,C,pop_size=50, generations=100, cxr=0.8, mutr=0.2):
         raise ValueError("參數 P, D, C的長度必須相同")
     elif len(P) == 0:
         raise ValueError("參數 P, D, C的長度必須大於零")
-    
+
     l = GA(P,D,C)
     n = len(l)
     selected = []
@@ -116,7 +115,7 @@ def schedule(Name,P,D,C,method=1):
 if __name__ == "__main__":
     input_data = sys.stdin.read()
     data = json.loads(input_data)
-    
+
     expectedTime = data['expectedTime']
     penalty = data['penalty']
     endTimes = data['endTimes']
