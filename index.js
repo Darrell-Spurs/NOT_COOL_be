@@ -5,6 +5,7 @@ import admin from 'firebase-admin';
 import { doc, getDoc, updateDoc, collection, setDoc, getDocs, query, arrayUnion, where, Timestamp, serverTimestamp } from "firebase/firestore";
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './swagger.js';
+import { spawn } from "child_process";
 
 const app = express();
 app.use(express.json());
@@ -1599,7 +1600,6 @@ app.post('/tasks/:taskID/members', async (req, res) => {
 
 // Scheduleing-related APIs
 
-// Scheudle tasks
 /**
  * @swagger
  * /users/{userID}/schedule:
@@ -1613,72 +1613,157 @@ app.post('/tasks/:taskID/members', async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
+ *         description: User's unique ID
+ *         example: "user_123456789"
+ *       - in: query
+ *         name: alg
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Algorithm ID (1:J人排序,2:P人排序,3:endTimes,4:penalty,5:expectedTime)
+ *         example: 1
  *     responses:
  *       200:
  *         description: Computed schedule
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 result:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                   description: Schedule result from Python script
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: "Failed to fetch leaf tasks"
  */
 app.get('/users/:userID/schedule', async (req, res) => {
-  const { userID, algID } = req.body;
-  
-  try {
+    try {
+        const userID = req.params.userID;
+        const alg = parseInt(req.query.alg) || 1; // Default to 1 
+        //alg  scheduling 1:J人排序 2:P人排序
+        //     基本排序    3:endTimes(作業截止時間越早越前面) 4:penalty(越重要越前面) 5:expectedtime(作業需要花費時間越短越前面)
+
         const q = query(
-            collection(db, "Task"),
-            where("Member", "array-contains", userID),
-            where("State", "==", "On")
+          collection(db, "Task"),
+          where("UnfinishedMember", "array-contains", userID),
+          where("State", "==", "On"),
         );
 
         const snapshot = await getDocs(q);
+        const tasks = snapshot.docs;
+
+        const filteredTasks = [];
+
+        for (const taskDoc of tasks) {
+          const data = taskDoc.data();
+          const childIDs = data.Child || [];
+
+          // ✅ child 為空或未定義，直接保留
+          if (!childIDs || childIDs.length === 0) {
+            filteredTasks.push({
+              TaskID: data.TaskID,
+              UserID: userID,
+              Penalty: data.Penalty,
+              ExpectedTime: data.ExpectedTime,
+              EndTime: data.EndTime.toDate()
+            });
+            console.log(`Task ${data.TaskID} has no children, keeping it.`);
+            continue; // 跳過後面的 child 檢查
+          }
+
+          // 否則檢查 child 任務中是否包含該使用者
+          const childDocs = await Promise.all(
+            childIDs.map(id => getDoc(doc(db, "Task", id)))
+          );
+
+          const childHasUser = childDocs.some(childDoc => {
+            const childData = childDoc.data();
+            return childData?.Member?.includes(userID);
+          });
+
+          if (!childHasUser) {
+            filteredTasks.push({
+              TaskID: data.TaskID,
+              UserID: userID,
+              Penalty: data.Penalty,
+              ExpectedTime: data.ExpectedTime,
+              EndTime: data.EndTime.toDate()
+            });
+            console.log(`Task ${data.TaskID} has no children with user ${userID}, keeping it.`);
+          }
+        }
+
+        if (filteredTasks.length === 0) {
+        return res.json({ success: true, result: [] });
+        }
+
+        // Step 2: Process tasks to extract required fields
         const expectedTime = [];
         const penalty = [];
         const endTimes = [];
-        const taskNames = [];
-
-        let alg;
-        alg = algID; //選擇使用的演算法 1:GA 2:GA_2(總成本更低但更慢) 3:endTimes 4:penalty 5:expectedtime
-
-        const taskList = snapshot.docs
-            .map(doc => {
-                const data = doc.data();
-                return {
-                    TaskName: data.TaskName,
-                    EndTime: data.EndTime.toDate(),
-                    Penalty: data.Penalty,
-                    ExpectedTime: data.ExpectedTime,
-                    Child:  data.Child,
-                    Parent: data.Parent,
-                    TaskID: data.TaskID,
-                    UserID: userID,
-                    TaskDetail: data.TaskDetail,
-                    CreatedTime: data.CreatedTime.toDate(),
-                    State: data.State,
-                    Member: data.Member
-                };
-            })
-            .filter(task => task.Child.length == 0);
-
+        const taskIDs = [];
         const now = new Date();
-        //可能需要考慮一天有多少時間可以寫功課?
-        for (var i = 0; i < taskList.length; i++) {
-            expectedTime.push(taskList[i].ExpectedTime),
-            penalty.push(taskList[i].Penalty),
-            endTimes.push((taskList[i].EndTime.getTime() - now.getTime()) / 1000), // 單位為秒 
-            taskNames.push(taskList[i].TaskName)
-        };
-        const result = await callSchedule(expectedTime, penalty, endTimes, taskNames, alg);
 
-        return res.json({ success: true, result: result });
+        for (const task of filteredTasks) {
+            expectedTime.push(task.ExpectedTime || 3600); // Default to 3600 seconds
+            penalty.push(task.Penalty || 0); // Default to 0 if not provided
+            endTimes.push((new Date(task.EndTime).getTime() - now.getTime()) / 4000); // Convert to seconds 假設一天只有6小時可以完成作業
+            taskIDs.push(task.TaskID);
+        }
+
+        // Step 3: Call /schedule/compute
+        const computeResponse = await fetch('http://127.0.0.1:3000/schedule/compute', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                expectedTime,
+                penalty,
+                endTimes,
+                taskIDs,
+                alg,
+            }),
+        });
+
+        if (!computeResponse.ok) {
+            throw new Error(`Failed to compute schedule: ${computeResponse.status}`);
+        }
+
+        const computeData = await computeResponse.json();
+        if (!computeData.success) {
+            return res.status(500).json({ success: false, error: computeData.error || 'Failed to compute schedule' });
+        }
+
+        // Step 4: Return the result
+        return res.json({ success: true, result: computeData.result });
 
     } catch (error) {
-      console.error('Error scheduling tasks:', error);
-      return res.status(500).json({ success: false, error: error.message });
+        console.error('Error scheduling tasks:', error);
+        return res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// Call python function
 /**
  * @swagger
  * /schedule/compute:
- *   get:
+ *   post:
  *     tags:
  *       - Scheduling
  *     summary: Run external Python-based scheduler
@@ -1693,32 +1778,91 @@ app.get('/users/:userID/schedule', async (req, res) => {
  *                 type: array
  *                 items:
  *                   type: number
+ *                 description: Array of expected times for tasks in minutes
+ *                 example: [120, 60, 180]
  *               penalty:
  *                 type: array
  *                 items:
  *                   type: number
+ *                 description: Array of penalty scores for tasks
+ *                 example: [10, 5, 15]
  *               endTimes:
  *                 type: array
  *                 items:
  *                   type: number
- *               taskNames:
+ *                 description: Array of time until due in seconds
+ *                 example: [86400, 172800, 259200]
+ *               taskIDs:
  *                 type: array
  *                 items:
  *                   type: string
+ *                 description: Array of task IDs
+ *                 example: ["Task A", "Task B", "Task C"]
  *               alg:
  *                 type: integer
+ *                 description: Algorithm ID (e.g., 1 for GA, 2 for GA_2, etc.)
+ *                 example: 1
+ *             required:
+ *               - expectedTime
+ *               - penalty
+ *               - endTimes
+ *               - taskNames
+ *               - alg
  *     responses:
  *       200:
  *         description: Computed schedule from Python
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 result:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                   description: Schedule result from Python script
+ *       400:
+ *         description: Bad request - missing required fields
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: "Missing required fields"
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: "Invalid output from Python script"
  */
-app.get('/schedule/compute', async (req, res) => {
-  const { expectedTime, penalty, endTimes, taskNames, alg } = req.body;
+app.post('/schedule/compute', async (req, res) => {
+  const { expectedTime, penalty, endTimes, taskIDs, alg } = req.body;
+
+  if (!expectedTime || !penalty || !endTimes || !taskIDs || !alg) {
+    return res.status(400).json({ success: false, error: 'Missing required fields' });
+  }
 
   const input = JSON.stringify({
       expectedTime,
       penalty,
       endTimes,
-      taskNames,
+      taskIDs,
       alg
   });
   const python = spawn("python", ["scheduling.py"]);
