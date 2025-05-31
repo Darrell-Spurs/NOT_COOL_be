@@ -553,6 +553,72 @@ app.post('/tasks', async (req, res) => {
   }  
 });
 
+/**
+ * @swagger
+ * /tasks/{taskID}:
+ *   get:
+ *     tags:
+ *       - Tasks
+ *     summary: Get a task by its ID
+ *     description: Retrieve the full task object by its TaskID
+ *     parameters:
+ *       - in: path
+ *         name: taskID
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Task ID to retrieve
+ *     responses:
+ *       200:
+ *         description: Task retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 task:
+ *                   type: object
+ *                   description: The full task object
+ *       404:
+ *         description: Task not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Task not found
+ *       500:
+ *         description: Internal server error
+ */
+
+app.get('/tasks/:taskID', async (req, res) => {
+  const { taskID } = req.params;
+
+  try {
+    const taskRef = doc(db, "Task", taskID);
+    const taskSnap = await getDoc(taskRef);
+
+    if (!taskSnap.exists()) {
+      return res.status(404).json({ success: false, message: 'Task not found' });
+    }
+
+    const taskData = taskSnap.data();
+
+    return res.status(200).json({ success: true, task: taskData });
+
+  } catch (error) {
+    console.error('Error fetching task:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // User-related APIs
 // get user ID by username
@@ -625,7 +691,7 @@ app.get('/users/by-username/:username', async (req, res) => {
     const snapshot = await getDocs(q);
 
     if (snapshot.empty) {
-        return { success: false, message: `User ${userName} Not Found.` };
+        return res.status(404).json({ success: false, message: `User ${userName} not found.` });
     }
 
     const userData = snapshot.docs[0].data();
@@ -633,7 +699,7 @@ app.get('/users/by-username/:username', async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching user ID:', error);
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).res.json({ success: false, message: `User ${userName} Not Found.` });
   }
 });
 
