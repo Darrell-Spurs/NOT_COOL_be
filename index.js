@@ -731,6 +731,8 @@ app.get('/users/:userID/tasks/root', async (req, res) => {
         CreatedTime: data.CreatedTime?.toDate?.() ?? null,
         EndTime: data.EndTime?.toDate?.() ?? null,
         State: data.State,
+        Penalty: data.Penalty,
+        ExpectedTime: data.ExpectedTime,
         Member: data.Member,
       };
     });
@@ -847,6 +849,8 @@ app.get('/users/:userID/tasks/leaf', async (req, res) => {
                 CreatedTime: data.CreatedTime.toDate(),
                 EndTime: data.EndTime.toDate(),
                 State: data.State,
+                Penalty: data.Penalty,
+                ExpectedTime: data.ExpectedTime,
                 Member: data.Member
             });
             console.log(`Task ${data.TaskID} has no children, keeping it.`);
@@ -984,6 +988,8 @@ app.get('/users/:userID/tasks/finished-root', async (req, res) => {
         CreatedTime: data.CreatedTime?.toDate?.() ?? null,
         EndTime: data.EndTime?.toDate?.() ?? null,
         State: data.State,
+        Penalty: data.Penalty,
+        ExpectedTime: data.ExpectedTime,
         Member: data.Member,
       };
     });
@@ -1101,6 +1107,8 @@ app.get('/users/:userID/tasks/finished-leaf', async (req, res) => {
                 CreatedTime: data.CreatedTime.toDate(),
                 EndTime: data.EndTime.toDate(),
                 State: data.State,
+                Penalty: data.Penalty,
+                ExpectedTime: data.ExpectedTime,
                 Member: data.Member
             });
             continue; // 跳過後面的 child 檢查
@@ -1602,20 +1610,36 @@ app.post('/tasks/:taskID/members', async (req, res) => {
 
 /**
  * @swagger
+/**
+ * @swagger
  * /users/{userID}/schedule:
-	@@ -1613,72 +1613,157 @@ app.post('/tasks/:taskID/members', async (req, res) => {
+ *   get:
+ *     tags:
+ *       - Scheduling
+ *     summary: Schedule a user's tasks
+ *     description: |
+ *       Retrieves all leaf tasks assigned to a user and computes a task schedule using a selected algorithm.
+ *       Algorithm options:
+ *         - 1: Member-based (J sorting)
+ *         - 2: Penalty-based (P sorting)
+ *         - 3: Earliest Deadline First
+ *         - 4: Highest Penalty First
+ *         - 5: Shortest Expected Time First
+ *     parameters:
+ *       - in: path
+ *         name: userID
  *         required: true
  *         schema:
  *           type: string
- *         description: User's unique ID
- *         example: "user_123456789"
+ *         description: The ID of the user whose tasks should be scheduled
  *       - in: query
  *         name: alg
+ *         required: false
  *         schema:
  *           type: integer
+ *           enum: [1, 2, 3, 4, 5]
  *           default: 1
- *         description: Algorithm ID (1:J人排序,2:P人排序,3:endTimes,4:penalty,5:expectedTime)
- *         example: 1
+ *         description: Algorithm ID to use for scheduling
  *     responses:
  *       200:
  *         description: Computed schedule
@@ -1629,9 +1653,20 @@ app.post('/tasks/:taskID/members', async (req, res) => {
  *                   example: true
  *                 result:
  *                   type: array
+ *                   description: Schedule result from Python script
  *                   items:
  *                     type: object
- *                   description: Schedule result from Python script
+ *                     properties:
+ *                       TaskID:
+ *                         type: string
+ *                         example: "abc123"
+ *                       StartTime:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2025-06-01T12:00:00Z"
+ *                       Duration:
+ *                         type: number
+ *                         example: 3600
  *       500:
  *         description: Internal server error
  *         content:
@@ -1677,7 +1712,6 @@ app.get('/users/:userID/schedule', async (req, res) => {
               ExpectedTime: data.ExpectedTime,
               EndTime: data.EndTime.toDate()
             });
-            console.log(`Task ${data.TaskID} has no children, keeping it.`);
             continue; // 跳過後面的 child 檢查
           }
 
