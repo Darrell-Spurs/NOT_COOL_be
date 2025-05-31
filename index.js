@@ -737,6 +737,7 @@ app.get('/users/:userID/tasks/root', async (req, res) => {
         Penalty: data.Penalty,
         ExpectedTime: data.ExpectedTime,
         Member: data.Member,
+        UnfinishedMember: data.UnfinishedMember || []
       };
     });
 
@@ -854,7 +855,9 @@ app.get('/users/:userID/tasks/leaf', async (req, res) => {
                 State: data.State,
                 Penalty: data.Penalty,
                 ExpectedTime: data.ExpectedTime,
-                Member: data.Member
+                Member: data.Member,
+                UnfinishedMember: data.UnfinishedMember || []
+
             });
             console.log(`Task ${data.TaskID} has no children, keeping it.`);
             continue; // 跳過後面的 child 檢查
@@ -879,7 +882,8 @@ app.get('/users/:userID/tasks/leaf', async (req, res) => {
                 CreatedTime: data.CreatedTime.toDate(),
                 EndTime: data.EndTime.toDate(),
                 State: data.State,
-                Member: data.Member
+                Member: data.Member,
+                UnfinishedMember: data.UnfinishedMember || []
             });
             console.log(`Task ${data.TaskID} has no children with user ${userID}, keeping it.`);
         }
@@ -994,6 +998,7 @@ app.get('/users/:userID/tasks/finished-root', async (req, res) => {
         Penalty: data.Penalty,
         ExpectedTime: data.ExpectedTime,
         Member: data.Member,
+        UnfinishedMember: data.UnfinishedMember || [],
       };
     });
 
@@ -1112,7 +1117,8 @@ app.get('/users/:userID/tasks/finished-leaf', async (req, res) => {
                 State: data.State,
                 Penalty: data.Penalty,
                 ExpectedTime: data.ExpectedTime,
-                Member: data.Member
+                Member: data.Member,
+                UnfinishedMember: data.UnfinishedMember || []
             });
             continue; // 跳過後面的 child 檢查
         }
@@ -1933,7 +1939,10 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 //   console.log('🚀 Backend running on http://0.0.0.0:3000');
 // });
 
-app.listen(3000, '127.0.0.1', () => {
-  console.log('🚀 Backend running on http://127.0.0.1:3000');
-  console.log('📚 Swagger docs at http://localhost:3000/api-docs');
+const PORT = 3000;
+const IP = "192.168.1.15";
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Backend running at http://${IP}:${PORT}`);
+  console.log(`📚 Swagger docs at http://${IP}:${PORT}/api-docs`);
 });
