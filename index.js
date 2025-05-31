@@ -1599,7 +1599,6 @@ app.post('/tasks/:taskID/members', async (req, res) => {
 
 // Scheduleing-related APIs
 
-// Scheudle tasks
 /**
  * @swagger
  * /users/{userID}/schedule:
@@ -1607,18 +1606,66 @@ app.post('/tasks/:taskID/members', async (req, res) => {
  *     tags:
  *       - Scheduling
  *     summary: Generate schedule for a user
+ *     description: |
+ *       Retrieves all leaf tasks assigned to a user and computes a task schedule based on the specified algorithm.
+ *       Supported algorithms:
+ *       - 1: Genetic Algorithm (fast)
+ *       - 2: Genetic Algorithm 2 (slower, lower cost)
+ *       - 3: Earliest Deadline First
+ *       - 4: Highest Penalty First
+ *       - 5: Shortest Expected Time First
  *     parameters:
  *       - in: path
  *         name: userID
  *         required: true
  *         schema:
  *           type: string
+ *         description: ID of the user to schedule tasks for
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - algID
+ *             properties:
+ *               algID:
+ *                 type: integer
+ *                 enum: [1, 2, 3, 4, 5]
+ *                 description: Algorithm ID used for scheduling
+ *                 example: 1
  *     responses:
  *       200:
  *         description: Computed schedule
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 result:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       TaskName:
+ *                         type: string
+ *                         example: "Finish Report"
+ *                       StartTime:
+ *                         type: string
+ *                         format: date-time
+ *                       Duration:
+ *                         type: number
+ *                         example: 3600
+ *       500:
+ *         description: Server error during scheduling
  */
 app.get('/users/:userID/schedule', async (req, res) => {
-  const { userID, algID } = req.body;
+  const { algID } = req.body;
+  const { userID } = req.params;
   
   try {
         const q = query(
