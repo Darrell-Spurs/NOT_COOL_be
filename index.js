@@ -6,8 +6,11 @@ import { doc, getDoc, updateDoc, collection, setDoc, getDocs, query, arrayUnion,
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './swagger.js';
 import { spawn } from "child_process";
+import cors from 'cors';
+
 
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 
