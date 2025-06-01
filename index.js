@@ -1608,24 +1608,25 @@ app.get('/users/:userID/meetings', async (req, res) => {
   try {
     const userID = req.params.userID;
 
+    // Step 1: Get TaskIDs where user is a Member and State is "On"
     const taskQuery = query(
       collection(db, "Task"),
-      where("UserID", "==", userID)
+      where("Member", "array-contains", userID),
+      where("State", "==", "On")
     );
     const taskSnapshot = await getDocs(taskQuery);
-
     const taskIDs = taskSnapshot.docs.map(doc => doc.data().TaskID);
 
     if (taskIDs.length === 0) {
       return res.json({ success: true, meetings: [] });
     }
 
+    // Step 2: Look up Meeting where TaskID in taskIDs (chunked in batches of 10)
     const meetingResults = [];
     const chunkSize = 10;
 
     for (let i = 0; i < taskIDs.length; i += chunkSize) {
       const chunk = taskIDs.slice(i, i + chunkSize);
-
       const meetingQuery = query(
         collection(db, "Meeting"),
         where("TaskID", "in", chunk)
@@ -1635,12 +1636,12 @@ app.get('/users/:userID/meetings', async (req, res) => {
       const meetings = meetingSnapshot.docs.map(doc => {
         const data = doc.data();
         return {
-          TaskID: data.TaskID,
           MeetingID: data.MeetingID,
           MeetingName: data.MeetingName,
           MeetingDetail: data.MeetingDetail,
           StartTime: data.StartTime?.toDate?.() ?? null,
           Duration: data.Duration,
+          TaskID: data.TaskID,
         };
       });
 
