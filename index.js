@@ -911,6 +911,66 @@ app.get('/users/by-username/:username', async (req, res) => {
   }
 });
 
+
+// Get user arrange value by UserID
+/**
+ * @swagger
+ * /users/{userID}/arrange:
+ *   get:
+ *     tags:
+ *       - Users
+ *     summary: Get Arrange value of a user
+ *     description: Retrieve the Arrange field from the user document in Firestore.
+ *     parameters:
+ *       - in: path
+ *         name: userID
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The ID of the user to query
+ *     responses:
+ *       200:
+ *         description: User arrange value fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 userID:
+ *                   type: string
+ *                 arrange:
+ *                   type: integer
+ *                   nullable: true
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
+app.get('/users/:userID/arrange', async (req, res) => {
+  try {
+    const userID = req.params.userID;
+    const docRef = doc(db, "User", userID);
+    const docSnap = await getDoc(docRef);
+
+    if (!docSnap.exists()) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const data = docSnap.data();
+    return res.json({
+      success: true,
+      userID,
+      arrange: data.Arrange ?? null
+    });
+  } catch (error) {
+    console.error("Error fetching user arrange:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Get user root tasks by UserID
 /**
  * @swagger
@@ -1652,6 +1712,82 @@ app.get('/users/:userID/meetings', async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching user meetings:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get a meeting by its MeetingID
+/**
+ * @swagger
+ * /meetings/{meetingID}:
+ *   get:
+ *     tags:
+ *       - Meetings
+ *     summary: Get a meeting by MeetingID
+ *     description: Fetch a specific meeting document using its MeetingID.
+ *     parameters:
+ *       - in: path
+ *         name: meetingID
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The ID of the meeting to retrieve
+ *     responses:
+ *       200:
+ *         description: Meeting fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 meeting:
+ *                   type: object
+ *                   properties:
+ *                     MeetingID:
+ *                       type: string
+ *                     MeetingName:
+ *                       type: string
+ *                     MeetingDetail:
+ *                       type: string
+ *                     StartTime:
+ *                       type: string
+ *                       format: date-time
+ *                     Duration:
+ *                       type: integer
+ *                     TaskID:
+ *                       type: string
+ *       404:
+ *         description: Meeting not found
+ *       500:
+ *         description: Server error
+ */
+app.get('/meetings/:meetingID', async (req, res) => {
+  try {
+    const meetingID = req.params.meetingID;
+    const docRef = doc(db, "Meeting", meetingID);
+    const docSnap = await getDoc(docRef);
+
+    if (!docSnap.exists()) {
+      return res.status(404).json({ success: false, message: "Meeting not found" });
+    }
+
+    const data = docSnap.data();
+    return res.json({
+      success: true,
+      meeting: {
+        MeetingID: data.MeetingID,
+        MeetingName: data.MeetingName,
+        MeetingDetail: data.MeetingDetail,
+        StartTime: data.StartTime?.toDate?.() ?? null,
+        Duration: data.Duration,
+        TaskID: data.TaskID
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching meeting:", error);
     return res.status(500).json({ success: false, error: error.message });
   }
 });
