@@ -1190,15 +1190,15 @@ app.get('/users/:userID/tasks/finished-root', async (req, res) => {
     const q = query(
       collection(db, "Task"),
       where("Member", "array-contains", userID),
-      where("Unfinished", "!array-contains", userID),
       where("State", "==", "On"),
       where("Parent", "==", "NULL")
     );
 
     const snapshot = await getDocs(q);
-    const taskList = snapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
+    const taskList = snapshot.docs
+      .map(doc => doc.data())
+      .filter(data => !((data.UnfinishedMember || []).includes(userID)))
+      .map(data => ({
         TaskID: data.TaskID,
         UserID: userID,
         TaskName: data.TaskName,
@@ -1210,8 +1210,7 @@ app.get('/users/:userID/tasks/finished-root', async (req, res) => {
         ExpectedTime: data.ExpectedTime,
         Member: data.Member,
         UnfinishedMember: data.UnfinishedMember || [],
-      };
-    });
+      }));
 
     return res.json({ success: true, tasks: taskList });
 
@@ -1303,7 +1302,6 @@ app.get('/users/:userID/tasks/finished-leaf', async (req, res) => {
     const q = query(
       collection(db, "Task"),
       where("Member", "array-contains", userID),
-      where("UnfinishedMember", "!array-contains", userID),
       where("State", "==", "On"),
     );
 
@@ -1314,6 +1312,10 @@ app.get('/users/:userID/tasks/finished-leaf', async (req, res) => {
 
     for (const taskDoc of tasks) {
       const data = taskDoc.data();
+
+      // Skip if user is still in UnfinishedMember
+      if ((data.UnfinishedMember || []).includes(userID)) continue;
+      
       const childIDs = data.child || [];
 
       // ✅ child 為空或未定義，直接保留
