@@ -7,6 +7,19 @@ import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './swagger.js';
 import { spawn } from "child_process";
 import cors from 'cors';
+import os from 'os';
+
+function getLocalIPAddress() {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return 'localhost';
+}
 
 
 const app = express();
@@ -401,6 +414,58 @@ app.post('/users', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /login:
+ *   post:
+ *     summary: Authenticate user
+ *     tags:
+ *       - Users
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [UserID, Password]
+ *             properties:
+ *               UserID:
+ *                 type: string
+ *               Password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *       401:
+ *         description: Invalid credentials
+ *       404:
+ *         description: User not found
+ */
+app.post('/login', async (req, res) => {
+  const { UserID, Password } = req.body;
+
+  if (!UserID || !Password) {
+    return res.status(400).json({ success: false, message: "UserID and Password are required." });
+  }
+
+  try {
+    const userDoc = await getDoc(doc(db, 'User', UserID));
+    if (!userDoc.exists()) {
+      return res.status(404).json({ success: false, message: `User ${UserID} not found.` });
+    }
+
+    const userData = userDoc.data();
+    if (userData.Password !== Password) {
+      return res.status(401).json({ success: false, message: "Incorrect password." });
+    }
+
+    return res.status(200).json({ success: true, message: "Login successful", user: userData });
+  } catch (error) {
+    console.error("Login error:", error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
 // Create a new task 
 /**
  * @swagger
@@ -445,12 +510,6 @@ app.post('/users', async (req, res) => {
  *                 type: number
  *                 description: Expected time to complete in minutes (default 60)
  *                 example: 120
- *               Member:
- *                 type: array
- *                 items:
- *                   type: string
- *                 description: Array of member user IDs (defaults to [UserID])
- *                 example: ["user_123456789", "user_987654321"]
  *             required:
  *               - UserID
  *               - TaskName
@@ -517,9 +576,7 @@ app.post('/tasks', async (req, res) => {
       const docRef = doc(collection(db, "Task"));
       const TaskID = docRef.id;
       const State = "On";
-  
-      const finalMember = Member ?? [UserID]; // 如果沒提供 Member，就預設為 [UserID]
-      
+        
       const Child = [];
       const data = {
           TaskID,
@@ -533,8 +590,8 @@ app.post('/tasks', async (req, res) => {
           Parent,
           Penalty,
           ExpectedTime,
-          Member: finalMember,
-          UnfinishedMember: finalMember,
+          Member: UserID,
+          UnfinishedMember: UserID,
     };
       
       await setDoc(docRef, data);
@@ -553,6 +610,7 @@ app.post('/tasks', async (req, res) => {
   }  
 });
 
+// Get a task by its ID
 /**
  * @swagger
  * /tasks/{taskID}:
@@ -598,7 +656,6 @@ app.post('/tasks', async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-
 app.get('/tasks/:taskID', async (req, res) => {
   const { taskID } = req.params;
 
@@ -619,6 +676,84 @@ app.get('/tasks/:taskID', async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
+
+/**
+ * @swagger
+ * /tasks/{taskID}:
+ *   put:
+ *     tags:
+ *       - Tasks
+ *     summary: Edit a task's allowed fields
+ *     parameters:
+ *       - in: path
+ *         name: taskID
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The ID of the task to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               TaskName:
+ *                 type: string
+ *               TaskDetail:
+ *                 type: string
+ *               EndTime:
+ *                 type: string
+ *                 format: date-time
+ *               ExpectedTime:
+ *                 type: number
+ *               Penalty:
+ *                 type: number
+ *     responses:
+ *       200:
+ *         description: Task updated successfully
+ *       400:
+ *         description: Invalid fields in request
+ *       500:
+ *         description: Server error
+ */
+app.put('/tasks/:taskID', async (req, res) => {
+  const { taskID } = req.params;
+  const updates = req.body;
+
+  const allowedFields = ["EndTime", "ExpectedTime", "Penalty", "TaskDetail", "TaskName"];
+  const updateData = {};
+
+  for (const key of Object.keys(updates)) {
+    if (!allowedFields.includes(key)) {
+      return res.status(400).json({
+        success: false,
+        message: `Field "${key}" is not allowed to be updated.`,
+      });
+    }
+
+    if (key === "EndTime") {
+      updateData[key] = Timestamp.fromDate(new Date(updates[key]));
+    } else {
+      updateData[key] = updates[key];
+    }
+  }
+
+  try {
+    const taskRef = doc(db, "Task", taskID);
+    await updateDoc(taskRef, updateData);
+
+    return res.status(200).json({
+      success: true,
+      message: `Task ${taskID} updated successfully.`,
+    });
+  } catch (error) {
+    console.error('Error updating task:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
 
 // User-related APIs
 // get user ID by username
@@ -1221,13 +1356,15 @@ app.get('/users/:userID/tasks/finished-leaf', async (req, res) => {
   }
 });
 
+// Meetings-related APIs
+
 // Get user meetings by UserID
 /**
  * @swagger
  * /users/{userID}/meetings:
  *   get:
  *     tags:
- *       - Users
+ *       - Meetings
  *     summary: Get meetings for a user
  *     parameters:
  *       - in: path
@@ -1337,6 +1474,54 @@ app.get('/users/:userID/meetings', async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
+
+// Edit a meeting by its ID
+/**
+ * @swagger
+ * /meetings/{meetingID}:
+ *   put:
+ *     summary: Edit meeting by ID
+ *     tags:
+ *       - Meetings
+ *     parameters:
+ *       - in: path
+ *         name: meetingID
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             description: Fields to update
+ *     responses:
+ *       200:
+ *         description: Meeting updated
+ *       404:
+ *         description: Meeting not found
+ */
+app.put('/meetings/:meetingID', async (req, res) => {
+  const { meetingID } = req.params;
+  const updates = req.body;
+
+  try {
+    const meetingRef = doc(db, 'Meeting', meetingID);
+    const meetingSnap = await getDoc(meetingRef);
+
+    if (!meetingSnap.exists()) {
+      return res.status(404).json({ success: false, message: "Meeting not found." });
+    }
+
+    await updateDoc(meetingRef, updates);
+    return res.status(200).json({ success: true, message: "Meeting updated." });
+  } catch (error) {
+    console.error("Update meeting error:", error);
+    return res.status(500).json({ success: false, message: "Failed to update meeting." });
+  }
+});
+
 
 // Task-related APIs
 // Mark a task as finished by changing itself all its children's UnfinishedMember array
@@ -2006,7 +2191,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // });
 
 const PORT = 3000;
-const IP = "192.168.1.15";
+const IP = getLocalIPAddress();
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Backend running at http://${IP}:${PORT}`);
