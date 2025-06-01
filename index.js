@@ -2,12 +2,13 @@ import express from 'express';
 import fetch from 'node-fetch';
 import { db } from "./firebaseConfig.js";
 import admin from 'firebase-admin';
-import { doc, getDoc, updateDoc, collection, setDoc, getDocs, deleteDoc, query, arrayUnion, where, Timestamp, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, setDoc, getDocs, deleteDoc, query, arrayUnion, arrayRemove, where, Timestamp, serverTimestamp } from "firebase/firestore";
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './swagger.js';
 import { spawn } from "child_process";
 import cors from 'cors';
 import os from 'os';
+import { get } from 'http';
 
 function getLocalIP() {
   const interfaces = os.networkInterfaces();
@@ -19,8 +20,8 @@ function getLocalIP() {
 
       // Ignore VirtualBox, Docker, VPNs by filtering interface names if needed
       const isRealInterface = !name.toLowerCase().includes('vmware') &&
-                              !name.toLowerCase().includes('virtual') &&
-                              !name.toLowerCase().includes('loopback');
+        !name.toLowerCase().includes('virtual') &&
+        !name.toLowerCase().includes('loopback');
 
       if (isIPv4 && isNotInternal && isRealInterface) {
         return iface.address;
@@ -581,26 +582,26 @@ app.post('/tasks', async (req, res) => {
     return res.status(400).json({ success: false, message: 'All fields are required' });
   }
 
-  try{
-      const docRef = doc(collection(db, "Task"));
-      const TaskID = docRef.id;
-      const State = "On";
-        
-      const Child = [];
-      const data = {
-          TaskID,
-          UserID,
-          TaskName,
-          TaskDetail,
-          CreatedTime: serverTimestamp(),
-          EndTime: Timestamp.fromDate(new Date(EndTime)),
-          State,
-          Child,
-          Parent,
-          Penalty,
-          ExpectedTime,
-          Member: [UserID],
-          UnfinishedMember: [UserID],
+  try {
+    const docRef = doc(collection(db, "Task"));
+    const TaskID = docRef.id;
+    const State = "On";
+
+    const Child = [];
+    const data = {
+      TaskID,
+      UserID,
+      TaskName,
+      TaskDetail,
+      CreatedTime: serverTimestamp(),
+      EndTime: Timestamp.fromDate(new Date(EndTime)),
+      State,
+      Child,
+      Parent,
+      Penalty,
+      ExpectedTime,
+      Member: [UserID],
+      UnfinishedMember: [UserID],
     };
 
     await setDoc(docRef, data);
@@ -1423,7 +1424,7 @@ app.get('/users/:userID/tasks/finished-leaf', async (req, res) => {
  */
 app.post('/meetings', async (req, res) => {
   const { MeetingName, MeetingDetail, Duration, StartTime, TaskID } = req.body;
-  if ( !MeetingName || !Duration || !StartTime || !TaskID ) {
+  if (!MeetingName || !Duration || !StartTime || !TaskID) {
     return res.status(400).json({ success: false, message: 'Missing required fields' });
   }
 
@@ -1723,8 +1724,8 @@ app.post('/tasks/:taskID/finish', async (req, res) => {
   try {
     // Helper function: recursively update task and children
     const removeUserRecursively = async (taskID) => {
-      const taskRef = db.collection("Task").doc(taskID);
-      const taskSnap = await taskRef.get();
+      const taskRef = doc(db, "Task", taskID);
+      const taskSnap = await getDoc(taskRef);
 
       if (!taskSnap.exists) return;
 
@@ -1735,8 +1736,8 @@ app.post('/tasks/:taskID/finish', async (req, res) => {
       if (!unfinishedMembers.includes(UserID)) return;
 
       // Remove the user
-      await taskRef.update({
-        UnfinishedMember: admin.firestore.FieldValue.arrayRemove(UserID),
+      await updateDoc(taskRef, {
+        UnfinishedMember: arrayRemove(UserID),
       });
 
       // Recurse into child tasks if they exist
@@ -1840,8 +1841,8 @@ app.post('/tasks/:taskID/unfinish', async (req, res) => {
   try {
     // Helper function: recursively update task and children
     const removeUserRecursively = async (taskID) => {
-      const taskRef = db.collection("Task").doc(taskID);
-      const taskSnap = await taskRef.get();
+      const taskRef = doc(db, "Task", taskID);
+      const taskSnap = await getDoc(taskRef);
 
       if (!taskSnap.exists) return;
 
@@ -1852,8 +1853,8 @@ app.post('/tasks/:taskID/unfinish', async (req, res) => {
       if (!unfinishedMembers.includes(UserID)) return;
 
       // Remove the user
-      await taskRef.update({
-        UnfinishedMember: admin.firestore.FieldValue.arrayUnion(UserID),
+      await updateDoc(taskRef, {
+        UnfinishedMember: arrayUnion(UserID),
       });
 
       // Recurse into child tasks if they exist
