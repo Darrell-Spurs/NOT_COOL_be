@@ -424,6 +424,69 @@ app.post('/users', async (req, res) => {
   }
 });
 
+
+/**
+ * @swagger
+ * /users/{userID}:
+ *   put:
+ *     tags:
+ *       - Users
+ *     summary: Update a user's information
+ *     description: Updates only the Arrange or UserName fields for a given user.
+ *     parameters:
+ *       - in: path
+ *         name: userID
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The ID of the user to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               Arrange:
+ *                 type: interger
+ *                 example: 1
+ *               UserName:
+ *                 type: string
+ *                 example: "Alice"
+ *     responses:
+ *       200:
+ *         description: User updated successfully
+ *       400:
+ *         description: Invalid or missing fields
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
+app.put('/users/:userID', async (req, res) => {
+  try {
+    const { userID } = req.params;
+    const { Arrange, UserName } = req.body;
+
+    const allowedUpdates = {};
+    if (Arrange !== undefined) allowedUpdates.Arrange = Arrange;
+    if (UserName !== undefined) allowedUpdates.UserName = UserName;
+
+    if (Object.keys(allowedUpdates).length === 0) {
+      return res.status(400).json({ success: false, message: "No valid fields provided for update." });
+    }
+
+    const userRef = doc(db, "User", userID);
+    await updateDoc(userRef, allowedUpdates);
+
+    return res.status(200).json({ success: true, message: `User ${userID} updated successfully.` });
+  } catch (error) {
+    console.error("Error updating user:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+
 /**
  * @swagger
  * /login:
