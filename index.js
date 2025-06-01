@@ -393,24 +393,24 @@ app.post('/users', async (req, res) => {
   if (!UserName) {
     return res.status(400).json({ success: false, message: 'UserName is required' });
   }
-  
-  try {
-      const docRef = doc(collection(db, "User"));
-      const UserID = docRef.id;
-    
-      const data = {
-          UserID,
-          UserName,
-          Password,
-          Arrange: 0
-  };
-  
-  await setDoc(docRef, data);
 
-  return res.status(201).json({ success: true, UserID });
+  try {
+    const docRef = doc(collection(db, "User"));
+    const UserID = docRef.id;
+
+    const data = {
+      UserID,
+      UserName,
+      Password,
+      Arrange: 0
+    };
+
+    await setDoc(docRef, data);
+
+    return res.status(201).json({ success: true, UserID });
   } catch (error) {
-      console.error('Error adding user:', error);
-      return res.status(500).json({ success: false, error: error.message });
+    console.error('Error adding user:', error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -558,56 +558,56 @@ app.post('/login', async (req, res) => {
  *                   example: "Database connection failed"
  */
 app.post('/tasks', async (req, res) => {
-  const { 
+  const {
     UserID,
     TaskName,
     TaskDetail,
-    EndTime, 
+    EndTime,
     Parent = "NULL",
     Penalty = 0,
     ExpectedTime = 60,
   } = req.body;
-  
+
   if (!UserID || !TaskName || !TaskDetail || !EndTime) {
-      return res.status(400).json({ success: false, message: 'All fields are required' });
+    return res.status(400).json({ success: false, message: 'All fields are required' });
   }
 
-  try{
-      const docRef = doc(collection(db, "Task"));
-      const TaskID = docRef.id;
-      const State = "On";
-        
-      const Child = [];
-      const data = {
-          TaskID,
-          UserID,
-          TaskName,
-          TaskDetail,
-          CreatedTime: serverTimestamp(),
-          EndTime: Timestamp.fromDate(new Date(EndTime)),
-          State,
-          Child,
-          Parent,
-          Penalty,
-          ExpectedTime,
-          Member: UserID,
-          UnfinishedMember: UserID,
-    };
-      
-      await setDoc(docRef, data);
-      
-      if (Parent !== "NULL") {
-        const parentRef = doc(db, "Task", Parent);
-        await updateDoc(parentRef, {
-          Child: arrayUnion(TaskID),
-        });
-      }
+  try {
+    const docRef = doc(collection(db, "Task"));
+    const TaskID = docRef.id;
+    const State = "On";
 
-      return res.status(201).json({ success: true, TaskID: TaskID });
-    } catch (error) {
-        console.error('Error adding task:', error);
-        return res.status(500).json({ success: false, error: error.message });
-  }  
+    const Child = [];
+    const data = {
+      TaskID,
+      UserID,
+      TaskName,
+      TaskDetail,
+      CreatedTime: serverTimestamp(),
+      EndTime: Timestamp.fromDate(new Date(EndTime)),
+      State,
+      Child,
+      Parent,
+      Penalty,
+      ExpectedTime,
+      Member: UserID,
+      UnfinishedMember: UserID,
+    };
+
+    await setDoc(docRef, data);
+
+    if (Parent !== "NULL") {
+      const parentRef = doc(db, "Task", Parent);
+      await updateDoc(parentRef, {
+        Child: arrayUnion(TaskID),
+      });
+    }
+
+    return res.status(201).json({ success: true, TaskID: TaskID });
+  } catch (error) {
+    console.error('Error adding task:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // Get a task by its ID
@@ -819,14 +819,14 @@ app.get('/users/by-username/:username', async (req, res) => {
     const userName = req.params.username;
 
     const q = query(
-        collection(db, "User"),
-        where("UserName", "==", userName)
+      collection(db, "User"),
+      where("UserName", "==", userName)
     );
 
     const snapshot = await getDocs(q);
 
     if (snapshot.empty) {
-        return res.status(404).json({ success: false, message: `User ${userName} not found.` });
+      return res.status(404).json({ success: false, message: `User ${userName} not found.` });
     }
 
     const userData = snapshot.docs[0].data();
@@ -918,10 +918,10 @@ app.get('/users/:userID/tasks/root', async (req, res) => {
     const userID = req.params.userID;
 
     const q = query(
-        collection(db, "Task"),
-        where("UnfinishedMember", "array-contains", userID),
-        where("State", "==", "On"),
-        where("Parent", "==", "NULL")
+      collection(db, "Task"),
+      where("UnfinishedMember", "array-contains", userID),
+      where("State", "==", "On"),
+      where("Parent", "==", "NULL")
     );
 
     const snapshot = await getDocs(q);
@@ -1030,9 +1030,9 @@ app.get('/users/:userID/tasks/leaf', async (req, res) => {
     const userID = req.params.userID;
 
     const q = query(
-        collection(db, "Task"),
-        where("UnfinishedMember", "array-contains", userID),
-        where("State", "==", "On"),
+      collection(db, "Task"),
+      where("UnfinishedMember", "array-contains", userID),
+      where("State", "==", "On"),
     );
 
     const snapshot = await getDocs(q);
@@ -1041,56 +1041,56 @@ app.get('/users/:userID/tasks/leaf', async (req, res) => {
     const filteredTasks = [];
 
     for (const taskDoc of tasks) {
-        const data = taskDoc.data();
-        const childIDs = data.Child || [];
+      const data = taskDoc.data();
+      const childIDs = data.Child || [];
 
-        // ✅ child 為空或未定義，直接保留
-        if (!childIDs || childIDs.length === 0) {
-            filteredTasks.push({
-                TaskID: data.TaskID,
-                UserID: userID,
-                TaskName: data.TaskName,
-                TaskDetail: data.TaskDetail,
-                CreatedTime: data.CreatedTime.toDate(),
-                EndTime: data.EndTime.toDate(),
-                State: data.State,
-                Penalty: data.Penalty,
-                ExpectedTime: data.ExpectedTime,
-                Member: data.Member,
-                UnfinishedMember: data.UnfinishedMember || []
+      // ✅ child 為空或未定義，直接保留
+      if (!childIDs || childIDs.length === 0) {
+        filteredTasks.push({
+          TaskID: data.TaskID,
+          UserID: userID,
+          TaskName: data.TaskName,
+          TaskDetail: data.TaskDetail,
+          CreatedTime: data.CreatedTime.toDate(),
+          EndTime: data.EndTime.toDate(),
+          State: data.State,
+          Penalty: data.Penalty,
+          ExpectedTime: data.ExpectedTime,
+          Member: data.Member,
+          UnfinishedMember: data.UnfinishedMember || []
 
-            });
-            console.log(`Task ${data.TaskID} has no children, keeping it.`);
-            continue; // 跳過後面的 child 檢查
-        }
-
-        // 否則檢查 child 任務中是否包含該使用者
-        const childDocs = await Promise.all(
-            childIDs.map(id => getDoc(doc(db, "Task", id)))
-        );
-
-        const childHasUser = childDocs.some(childDoc => {
-            const childData = childDoc.data();
-            return childData?.Member?.includes(userID);
         });
+        console.log(`Task ${data.TaskID} has no children, keeping it.`);
+        continue; // 跳過後面的 child 檢查
+      }
 
-        if (!childHasUser) {
-            filteredTasks.push({
-                TaskID: data.TaskID,
-                UserID: userID,
-                TaskName: data.TaskName,
-                TaskDetail: data.TaskDetail,
-                CreatedTime: data.CreatedTime.toDate(),
-                EndTime: data.EndTime.toDate(),
-                State: data.State,
-                Member: data.Member,
-                UnfinishedMember: data.UnfinishedMember || []
-            });
-            console.log(`Task ${data.TaskID} has no children with user ${userID}, keeping it.`);
-        }
+      // 否則檢查 child 任務中是否包含該使用者
+      const childDocs = await Promise.all(
+        childIDs.map(id => getDoc(doc(db, "Task", id)))
+      );
+
+      const childHasUser = childDocs.some(childDoc => {
+        const childData = childDoc.data();
+        return childData?.Member?.includes(userID);
+      });
+
+      if (!childHasUser) {
+        filteredTasks.push({
+          TaskID: data.TaskID,
+          UserID: userID,
+          TaskName: data.TaskName,
+          TaskDetail: data.TaskDetail,
+          CreatedTime: data.CreatedTime.toDate(),
+          EndTime: data.EndTime.toDate(),
+          State: data.State,
+          Member: data.Member,
+          UnfinishedMember: data.UnfinishedMember || []
+        });
+        console.log(`Task ${data.TaskID} has no children with user ${userID}, keeping it.`);
+      }
     }
 
-    return res.json({ success: true, tasks: filteredTasks});
+    return res.json({ success: true, tasks: filteredTasks });
 
   } catch (error) {
     console.error('Error fetching user tasks:', error);
@@ -1178,11 +1178,11 @@ app.get('/users/:userID/tasks/finished-root', async (req, res) => {
     const userID = req.params.userID;
 
     const q = query(
-        collection(db, "Task"),
-        where("Member", "array-contains", userID),
-        where("Unfinished", "!array-contains", userID),
-        where("State", "==", "On"),
-        where("Parent", "==", "NULL")
+      collection(db, "Task"),
+      where("Member", "array-contains", userID),
+      where("Unfinished", "!array-contains", userID),
+      where("State", "==", "On"),
+      where("Parent", "==", "NULL")
     );
 
     const snapshot = await getDocs(q);
@@ -1291,10 +1291,10 @@ app.get('/users/:userID/tasks/finished-leaf', async (req, res) => {
     const userID = req.params.userID;
 
     const q = query(
-        collection(db, "Task"),
-        where("Member", "array-contains", userID),
-        where("UnfinishedMember", "!array-contains", userID),
-        where("State", "==", "On"),
+      collection(db, "Task"),
+      where("Member", "array-contains", userID),
+      where("UnfinishedMember", "!array-contains", userID),
+      where("State", "==", "On"),
     );
 
     const snapshot = await getDocs(q);
@@ -1303,52 +1303,52 @@ app.get('/users/:userID/tasks/finished-leaf', async (req, res) => {
     const filteredTasks = [];
 
     for (const taskDoc of tasks) {
-        const data = taskDoc.data();
-        const childIDs = data.child || [];
+      const data = taskDoc.data();
+      const childIDs = data.child || [];
 
-        // ✅ child 為空或未定義，直接保留
-        if (!childIDs || childIDs.length === 0) {
-            filteredTasks.push({
-                TaskID: data.TaskID,
-                UserID: userID,
-                TaskName: data.TaskName,
-                TaskDetail: data.TaskDetail,
-                CreatedTime: data.CreatedTime.toDate(),
-                EndTime: data.EndTime.toDate(),
-                State: data.State,
-                Penalty: data.Penalty,
-                ExpectedTime: data.ExpectedTime,
-                Member: data.Member,
-                UnfinishedMember: data.UnfinishedMember || []
-            });
-            continue; // 跳過後面的 child 檢查
-        }
-
-        // 否則檢查 child 任務中是否包含該使用者
-        const childDocs = await Promise.all(
-            childIDs.map(id => getDoc(doc(db, "Task", id)))
-        );
-
-        const childHasUser = childDocs.some(childDoc => {
-            const childData = childDoc.data();
-            return childData?.Member?.includes(userID);
+      // ✅ child 為空或未定義，直接保留
+      if (!childIDs || childIDs.length === 0) {
+        filteredTasks.push({
+          TaskID: data.TaskID,
+          UserID: userID,
+          TaskName: data.TaskName,
+          TaskDetail: data.TaskDetail,
+          CreatedTime: data.CreatedTime.toDate(),
+          EndTime: data.EndTime.toDate(),
+          State: data.State,
+          Penalty: data.Penalty,
+          ExpectedTime: data.ExpectedTime,
+          Member: data.Member,
+          UnfinishedMember: data.UnfinishedMember || []
         });
+        continue; // 跳過後面的 child 檢查
+      }
 
-        if (!childHasUser) {
-            filteredTasks.push({
-                TaskID: data.TaskID,
-                UserID: userID,
-                TaskName: data.TaskName,
-                TaskDetail: data.TaskDetail,
-                CreatedTime: data.CreatedTime.toDate(),
-                EndTime: data.EndTime.toDate(),
-                State: data.State,
-                Member: data.Member
-            });
-        }
+      // 否則檢查 child 任務中是否包含該使用者
+      const childDocs = await Promise.all(
+        childIDs.map(id => getDoc(doc(db, "Task", id)))
+      );
+
+      const childHasUser = childDocs.some(childDoc => {
+        const childData = childDoc.data();
+        return childData?.Member?.includes(userID);
+      });
+
+      if (!childHasUser) {
+        filteredTasks.push({
+          TaskID: data.TaskID,
+          UserID: userID,
+          TaskName: data.TaskName,
+          TaskDetail: data.TaskDetail,
+          CreatedTime: data.CreatedTime.toDate(),
+          EndTime: data.EndTime.toDate(),
+          State: data.State,
+          Member: data.Member
+        });
+      }
     }
 
-    return res.json({ success: true, tasks: filteredTasks});
+    return res.json({ success: true, tasks: filteredTasks });
 
   } catch (error) {
     console.error('Error fetching user tasks:', error);
@@ -1429,8 +1429,8 @@ app.get('/users/:userID/meetings', async (req, res) => {
     const userID = req.params.userID;
 
     const taskQuery = query(
-        collection(db, "Task"),
-        where("UserID", "==", userID)
+      collection(db, "Task"),
+      where("UserID", "==", userID)
     );
     const taskSnapshot = await getDocs(taskQuery);
 
@@ -1447,8 +1447,8 @@ app.get('/users/:userID/meetings', async (req, res) => {
       const chunk = taskIDs.slice(i, i + chunkSize);
 
       const meetingQuery = query(
-          collection(db, "Meeting"),
-          where("TaskID", "in", chunk)
+        collection(db, "Meeting"),
+        where("TaskID", "in", chunk)
       );
       const meetingSnapshot = await getDocs(meetingQuery);
 
@@ -1715,22 +1715,25 @@ app.post('/tasks/:taskID/finish', async (req, res) => {
 app.post('/tasks/:taskID/delete', async (req, res) => {
   const { TaskID } = req.body;
 
-  if (!TaskID ) {
+  if (!TaskID) {
     return res.status(400).json({ success: false, message: 'TaskID and UserID are required' });
   }
 
   try {
     // Helper function: recursively update task and children
     const removeUserRecursively = async (taskID) => {
-      const taskRef = db.collection("Task").doc(taskID);
-      const taskSnap = await taskRef.get();
+      const taskRef = doc(db, "Task", taskID);
+      const taskSnap = await getDoc(taskRef);
 
       if (!taskSnap.exists) return;
 
       const taskData = taskSnap.data();
 
       // Remove the user
-      await taskRef.update({
+      // await taskRef.update({
+      //   State: "Deleted",
+      // });
+      await updateDoc(taskRef, {
         State: "Deleted",
       });
 
@@ -1825,7 +1828,7 @@ app.post('/tasks/:taskID/members', async (req, res) => {
   const { UserID } = req.body;
   const { taskID } = req.params;
 
-  if (!UserID ) {
+  if (!UserID) {
     return res.status(400).json({ success: false, message: 'UserID are required' });
   }
 
@@ -1834,7 +1837,7 @@ app.post('/tasks/:taskID/members', async (req, res) => {
     const updateTaskAndAncestors = async (taskID) => {
       const taskRef = doc(db, 'Task', taskID);
       const taskSnap = await getDoc(taskRef)
-      
+
       if (!taskSnap.exists) return;
 
       const taskData = taskSnap.data();
@@ -1942,110 +1945,110 @@ app.post('/tasks/:taskID/members', async (req, res) => {
  *                   example: "Failed to fetch leaf tasks"
  */
 app.get('/users/:userID/schedule', async (req, res) => {
-    try {
-        const userID = req.params.userID;
-        const alg = parseInt(req.query.alg) || 1; // Default to 1 
-        //alg  scheduling 1:J人排序 2:P人排序
-        //     基本排序    3:endTimes(作業截止時間越早越前面) 4:penalty(越重要越前面) 5:expectedtime(作業需要花費時間越短越前面)
+  try {
+    const userID = req.params.userID;
+    const alg = parseInt(req.query.alg) || 1; // Default to 1 
+    //alg  scheduling 1:J人排序 2:P人排序
+    //     基本排序    3:endTimes(作業截止時間越早越前面) 4:penalty(越重要越前面) 5:expectedtime(作業需要花費時間越短越前面)
 
-        const q = query(
-          collection(db, "Task"),
-          where("UnfinishedMember", "array-contains", userID),
-          where("State", "==", "On"),
-        );
+    const q = query(
+      collection(db, "Task"),
+      where("UnfinishedMember", "array-contains", userID),
+      where("State", "==", "On"),
+    );
 
-        const snapshot = await getDocs(q);
-        const tasks = snapshot.docs;
+    const snapshot = await getDocs(q);
+    const tasks = snapshot.docs;
 
-        const filteredTasks = [];
+    const filteredTasks = [];
 
-        for (const taskDoc of tasks) {
-          const data = taskDoc.data();
-          const childIDs = data.Child || [];
+    for (const taskDoc of tasks) {
+      const data = taskDoc.data();
+      const childIDs = data.Child || [];
 
-          // ✅ child 為空或未定義，直接保留
-          if (!childIDs || childIDs.length === 0) {
-            filteredTasks.push({
-              TaskID: data.TaskID,
-              UserID: userID,
-              Penalty: data.Penalty,
-              ExpectedTime: data.ExpectedTime,
-              EndTime: data.EndTime.toDate()
-            });
-            continue; // 跳過後面的 child 檢查
-          }
-
-          // 否則檢查 child 任務中是否包含該使用者
-          const childDocs = await Promise.all(
-            childIDs.map(id => getDoc(doc(db, "Task", id)))
-          );
-
-          const childHasUser = childDocs.some(childDoc => {
-            const childData = childDoc.data();
-            return childData?.Member?.includes(userID);
-          });
-
-          if (!childHasUser) {
-            filteredTasks.push({
-              TaskID: data.TaskID,
-              UserID: userID,
-              Penalty: data.Penalty,
-              ExpectedTime: data.ExpectedTime,
-              EndTime: data.EndTime.toDate()
-            });
-            console.log(`Task ${data.TaskID} has no children with user ${userID}, keeping it.`);
-          }
-        }
-
-        if (filteredTasks.length === 0) {
-        return res.json({ success: true, result: [] });
-        }
-
-        // Step 2: Process tasks to extract required fields
-        const expectedTime = [];
-        const penalty = [];
-        const endTimes = [];
-        const taskIDs = [];
-        const now = new Date();
-
-        for (const task of filteredTasks) {
-            expectedTime.push(task.ExpectedTime || 3600); // Default to 3600 seconds
-            penalty.push(task.Penalty || 0); // Default to 0 if not provided
-            endTimes.push((new Date(task.EndTime).getTime() - now.getTime()) / 4000); // Convert to seconds 假設一天只有6小時可以完成作業
-            taskIDs.push(task.TaskID);
-        }
-
-        // Step 3: Call /schedule/compute
-        const computeResponse = await fetch('http://127.0.0.1:3000/schedule/compute', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                expectedTime,
-                penalty,
-                endTimes,
-                taskIDs,
-                alg,
-            }),
+      // ✅ child 為空或未定義，直接保留
+      if (!childIDs || childIDs.length === 0) {
+        filteredTasks.push({
+          TaskID: data.TaskID,
+          UserID: userID,
+          Penalty: data.Penalty,
+          ExpectedTime: data.ExpectedTime,
+          EndTime: data.EndTime.toDate()
         });
+        continue; // 跳過後面的 child 檢查
+      }
 
-        if (!computeResponse.ok) {
-            throw new Error(`Failed to compute schedule: ${computeResponse.status}`);
-        }
+      // 否則檢查 child 任務中是否包含該使用者
+      const childDocs = await Promise.all(
+        childIDs.map(id => getDoc(doc(db, "Task", id)))
+      );
 
-        const computeData = await computeResponse.json();
-        if (!computeData.success) {
-            return res.status(500).json({ success: false, error: computeData.error || 'Failed to compute schedule' });
-        }
+      const childHasUser = childDocs.some(childDoc => {
+        const childData = childDoc.data();
+        return childData?.Member?.includes(userID);
+      });
 
-        // Step 4: Return the result
-        return res.json({ success: true, result: computeData.result });
-
-    } catch (error) {
-        console.error('Error scheduling tasks:', error);
-        return res.status(500).json({ success: false, error: error.message });
+      if (!childHasUser) {
+        filteredTasks.push({
+          TaskID: data.TaskID,
+          UserID: userID,
+          Penalty: data.Penalty,
+          ExpectedTime: data.ExpectedTime,
+          EndTime: data.EndTime.toDate()
+        });
+        console.log(`Task ${data.TaskID} has no children with user ${userID}, keeping it.`);
+      }
     }
+
+    if (filteredTasks.length === 0) {
+      return res.json({ success: true, result: [] });
+    }
+
+    // Step 2: Process tasks to extract required fields
+    const expectedTime = [];
+    const penalty = [];
+    const endTimes = [];
+    const taskIDs = [];
+    const now = new Date();
+
+    for (const task of filteredTasks) {
+      expectedTime.push(task.ExpectedTime || 3600); // Default to 3600 seconds
+      penalty.push(task.Penalty || 0); // Default to 0 if not provided
+      endTimes.push((new Date(task.EndTime).getTime() - now.getTime()) / 4000); // Convert to seconds 假設一天只有6小時可以完成作業
+      taskIDs.push(task.TaskID);
+    }
+
+    // Step 3: Call /schedule/compute
+    const computeResponse = await fetch('http://127.0.0.1:3000/schedule/compute', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        expectedTime,
+        penalty,
+        endTimes,
+        taskIDs,
+        alg,
+      }),
+    });
+
+    if (!computeResponse.ok) {
+      throw new Error(`Failed to compute schedule: ${computeResponse.status}`);
+    }
+
+    const computeData = await computeResponse.json();
+    if (!computeData.success) {
+      return res.status(500).json({ success: false, error: computeData.error || 'Failed to compute schedule' });
+    }
+
+    // Step 4: Return the result
+    return res.json({ success: true, result: computeData.result });
+
+  } catch (error) {
+    console.error('Error scheduling tasks:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 /**
@@ -2147,11 +2150,11 @@ app.post('/schedule/compute', async (req, res) => {
   }
 
   const input = JSON.stringify({
-      expectedTime,
-      penalty,
-      endTimes,
-      taskIDs,
-      alg
+    expectedTime,
+    penalty,
+    endTimes,
+    taskIDs,
+    alg
   });
   const python = spawn("python", ["scheduling.py"]);
 
@@ -2159,29 +2162,29 @@ app.post('/schedule/compute', async (req, res) => {
   let errorOutput = "";
 
   python.stdout.on("data", (data) => {
-      output += data.toString();
+    output += data.toString();
   });
 
   python.stderr.on("data", (data) => {
-      errorOutput += data.toString();
+    errorOutput += data.toString();
   });
 
   python.stdin.write(input);
   python.stdin.end();
 
   python.on("close", (code) => {
-      if (code !== 0) {
-          console.error("Python script error:", errorOutput);
-          return res.status(500).json({ success: false, error: errorOutput });
-      }  
-      try {
-        const parsed = JSON.parse(output);
-        return res.status(200).json({ success: true, result: parsed });
-      } catch (err) {
-          console.error("無法解析 Python 輸出：", output);
-          return res.status(500).json({ success: false, error: 'Invalid output from Python script' });
-      }
-    });
+    if (code !== 0) {
+      console.error("Python script error:", errorOutput);
+      return res.status(500).json({ success: false, error: errorOutput });
+    }
+    try {
+      const parsed = JSON.parse(output);
+      return res.status(200).json({ success: true, result: parsed });
+    } catch (err) {
+      console.error("無法解析 Python 輸出：", output);
+      return res.status(500).json({ success: false, error: 'Invalid output from Python script' });
+    }
+  });
 });
 
 
