@@ -2,25 +2,34 @@ import express from 'express';
 import fetch from 'node-fetch';
 import { db } from "./firebaseConfig.js";
 import admin from 'firebase-admin';
-import { doc, getDoc, updateDoc, collection, setDoc, getDocs, query, arrayUnion, where, Timestamp, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, setDoc, getDocs, deleteDoc, query, arrayUnion, where, Timestamp, serverTimestamp } from "firebase/firestore";
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './swagger.js';
 import { spawn } from "child_process";
 import cors from 'cors';
 import os from 'os';
 
-function getLocalIPAddress() {
+function getLocalIP() {
   const interfaces = os.networkInterfaces();
+
   for (const name of Object.keys(interfaces)) {
     for (const iface of interfaces[name]) {
-      if (iface.family === 'IPv4' && !iface.internal) {
+      const isIPv4 = iface.family === 'IPv4';
+      const isNotInternal = !iface.internal;
+
+      // Ignore VirtualBox, Docker, VPNs by filtering interface names if needed
+      const isRealInterface = !name.toLowerCase().includes('vmware') &&
+                              !name.toLowerCase().includes('virtual') &&
+                              !name.toLowerCase().includes('loopback');
+
+      if (isIPv4 && isNotInternal && isRealInterface) {
         return iface.address;
       }
     }
   }
-  return 'localhost';
-}
 
+  return '127.0.0.1'; // fallback
+}
 
 const app = express();
 app.use(cors());
@@ -590,8 +599,8 @@ app.post('/tasks', async (req, res) => {
           Parent,
           Penalty,
           ExpectedTime,
-          Member: UserID,
-          UnfinishedMember: UserID,
+          Member: [UserID],
+          UnfinishedMember: [UserID],
     };
       
       await setDoc(docRef, data);
@@ -1060,7 +1069,6 @@ app.get('/users/:userID/tasks/leaf', async (req, res) => {
                 UnfinishedMember: data.UnfinishedMember || []
 
             });
-            console.log(`Task ${data.TaskID} has no children, keeping it.`);
             continue; // 跳過後面的 child 檢查
         }
 
@@ -1086,7 +1094,6 @@ app.get('/users/:userID/tasks/leaf', async (req, res) => {
                 Member: data.Member,
                 UnfinishedMember: data.UnfinishedMember || []
             });
-            console.log(`Task ${data.TaskID} has no children with user ${userID}, keeping it.`);
         }
     }
 
@@ -1357,6 +1364,111 @@ app.get('/users/:userID/tasks/finished-leaf', async (req, res) => {
 });
 
 // Meetings-related APIs
+/**
+ * @swagger
+ * /meetings:
+ *   post:
+ *     tags:
+ *       - Meetings
+ *     summary: Create a new meeting
+ *     description: Adds a new meeting with the specified name, details, duration, and start time.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - MeetingName
+ *               - Duration
+ *               - StartTime
+ *               - TaskID
+ *             properties:
+ *               TaskID:
+ *                 type: string
+ *                 example: "Task_123456789"
+ *               MeetingName:
+ *                 type: string
+ *                 example: "Project Sync"
+ *               MeetingDetail:
+ *                 type: string
+ *                 example: "Weekly sync-up with the development team"
+ *               Duration:
+ *                 type: number
+ *                 example: 60
+ *               StartTime:
+ *                 type: string
+ *                 format: date-time
+ *                 example: "2025-06-01T10:00:00.000Z"
+ *     responses:
+ *       201:
+ *         description: Meeting created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Meeting created"
+ *       400:
+ *         description: Missing required fields
+ *       500:
+ *         description: Server error
+ */
+app.post('/meetings', async (req, res) => {
+  const { MeetingName, MeetingDetail, Duration, StartTime, TaskID } = req.body;
+  if ( !MeetingName || !Duration || !StartTime || !TaskID ) {
+    return res.status(400).json({ success: false, message: 'Missing required fields' });
+  }
+
+  const docRef = doc(collection(db, 'Meeting'));
+  const MeetingID = docRef.id;
+  console.log('MeetingID:', MeetingID);
+  try {
+    await setDoc(doc(db, 'Meeting', MeetingID), {
+      MeetingID: MeetingID,
+      MeetingName: MeetingName,
+      MeetingDetail: MeetingDetail || '',
+      Duration,
+      StartTime: Timestamp.fromDate(new Date(StartTime)),
+      TaskID,
+    });
+    return res.status(201).json({ success: true, message: 'Meeting created', meetingID: MeetingID });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /meetings/{MeetingID}:
+ *   delete:
+ *     tags:
+ *       - Meetings
+ *     summary: Delete a meeting
+ *     parameters:
+ *       - in: path
+ *         name: MeetingID
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Meeting deleted successfully
+ */
+app.delete('/meetings/:MeetingID', async (req, res) => {
+  const { MeetingID } = req.params;
+  try {
+    await deleteDoc(doc(db, 'Meeting', MeetingID));
+    return res.status(200).json({ success: true, message: 'Meeting deleted' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
 
 // Get user meetings by UserID
 /**
@@ -1638,6 +1750,123 @@ app.post('/tasks/:taskID/finish', async (req, res) => {
     return res.status(200).json({ success: true, message: `${UserID} marked as finished in ${TaskID} and its children` });
   } catch (error) {
     console.error("Error marking task finished:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /tasks/{taskID}/unfinish:
+ *   post:
+ *     tags:
+ *       - Tasks
+ *     summary: Mark task and its children as unfinished for a user
+ *     parameters:
+ *       - in: path
+ *         name: taskID
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Task ID to mark as unfinished
+ *         example: "task_123456789"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               TaskID:
+ *                 type: string
+ *                 description: Task ID to mark as unfinished
+ *                 example: "task_123456789"
+ *               UserID:
+ *                 type: string
+ *                 description: User ID who uncompleted the task
+ *                 example: "user_123456789"
+ *             required:
+ *               - TaskID
+ *               - UserID
+ *     responses:
+ *       200:
+ *         description: Task marked as unfinished successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "user_123456789 marked as unfinished in task_123456789 and its children"
+ *       400:
+ *         description: Bad request - missing required fields
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "TaskID and UserID are required"
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                   example: "Database update failed"
+ */
+app.post('/tasks/:taskID/unfinish', async (req, res) => {
+  const { TaskID, UserID } = req.body;
+
+  if (!TaskID || !UserID) {
+    return res.status(400).json({ success: false, message: 'TaskID and UserID are required' });
+  }
+
+  try {
+    // Helper function: recursively update task and children
+    const removeUserRecursively = async (taskID) => {
+      const taskRef = db.collection("Task").doc(taskID);
+      const taskSnap = await taskRef.get();
+
+      if (!taskSnap.exists) return;
+
+      const taskData = taskSnap.data();
+      const unfinishedMembers = taskData.UnfinishedMember || [];
+
+      // If user not in this task, no need to update or go deeper
+      if (!unfinishedMembers.includes(UserID)) return;
+
+      // Remove the user
+      await taskRef.update({
+        UnfinishedMember: admin.firestore.FieldValue.arrayUnion(UserID),
+      });
+
+      // Recurse into child tasks if they exist
+      const children = taskData.Child || [];
+      for (const childID of children) {
+        await removeUserRecursively(childID);
+      }
+    };
+
+    // Start the process from the root task
+    await removeUserRecursively(TaskID);
+
+    return res.status(200).json({ success: true, message: `${UserID} marked as unfinished in ${TaskID} and its children` });
+  } catch (error) {
+    console.error("Error marking task unfinished:", error);
     return res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -1993,7 +2222,6 @@ app.get('/users/:userID/schedule', async (req, res) => {
               ExpectedTime: data.ExpectedTime,
               EndTime: data.EndTime.toDate()
             });
-            console.log(`Task ${data.TaskID} has no children with user ${userID}, keeping it.`);
           }
         }
 
@@ -2191,7 +2419,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // });
 
 const PORT = 3000;
-const IP = getLocalIPAddress();
+const IP = getLocalIP();
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Backend running at http://${IP}:${PORT}`);
