@@ -9,6 +9,7 @@ import { spawn } from "child_process";
 import cors from 'cors';
 import os from 'os';
 import { get } from 'http';
+import fs from 'fs';
 
 function getLocalIP() {
   const interfaces = os.networkInterfaces();
@@ -36,6 +37,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.get('/swagger.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
+
+// Save to file on startup (optional)
+fs.writeFileSync('./swagger.json', JSON.stringify(swaggerSpec, null, 2));
 
 // Notification
 // Register push token and send a test notification
@@ -448,7 +456,7 @@ app.post('/users', async (req, res) => {
  *             type: object
  *             properties:
  *               Arrange:
- *                 type: interger
+ *                 type: integer
  *                 example: 1
  *               UserName:
  *                 type: string
