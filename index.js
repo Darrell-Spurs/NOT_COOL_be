@@ -2325,8 +2325,8 @@ app.post('/tasks/:taskID/members', async (req, res) => {
  *     description: |
  *       Retrieves all leaf tasks assigned to a user and computes a task schedule using a selected algorithm.
  *       Algorithm options:
- *         - 1: Member-based (J sorting)
- *         - 2: Penalty-based (P sorting)
+ *         - 1: GA (J sorting)
+ *         - 2: GA and Random (P sorting)
  *         - 3: Earliest Deadline First
  *         - 4: Highest Penalty First
  *         - 5: Shortest Expected Time First
@@ -2511,7 +2511,7 @@ app.get('/users/:userID/schedule', async (req, res) => {
  *                 type: array
  *                 items:
  *                   type: number
- *                 description: Array of expected times for tasks in minutes
+ *                 description: Array of expected times for tasks in seconds
  *                 example: [120, 60, 180]
  *               penalty:
  *                 type: array
@@ -2533,7 +2533,7 @@ app.get('/users/:userID/schedule', async (req, res) => {
  *                 example: ["Task A", "Task B", "Task C"]
  *               alg:
  *                 type: integer
- *                 description: Algorithm ID (e.g., 1 for GA, 2 for GA_2, etc.)
+ *                 description: Algorithm ID (e.g., 1 for GA, 2 for GA and Random, etc.)
  *                 example: 1
  *             required:
  *               - expectedTime
