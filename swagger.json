@@ -1999,7 +1999,7 @@
           "Scheduling"
         ],
         "summary": "Schedule a user's tasks",
-        "description": "Retrieves all leaf tasks assigned to a user and computes a task schedule using a selected algorithm.\nAlgorithm options:\n  - 1: Member-based (J sorting)\n  - 2: Penalty-based (P sorting)\n  - 3: Earliest Deadline First\n  - 4: Highest Penalty First\n  - 5: Shortest Expected Time First\n",
+        "description": "Retrieves all leaf tasks assigned to a user and computes a task schedule using a selected algorithm.\nAlgorithm options:\n  - 1: GA (J sorting)\n  - 2: GA and Random (P sorting)\n  - 3: Earliest Deadline First\n  - 4: Highest Penalty First\n  - 5: Shortest Expected Time First\n",
         "parameters": [
           {
             "in": "path",
@@ -2044,23 +2044,13 @@
                       "type": "array",
                       "description": "Schedule result from Python script",
                       "items": {
-                        "type": "object",
-                        "properties": {
-                          "TaskID": {
-                            "type": "string",
-                            "example": "abc123"
-                          },
-                          "StartTime": {
-                            "type": "string",
-                            "format": "date-time",
-                            "example": "2025-06-01T12:00:00Z"
-                          },
-                          "Duration": {
-                            "type": "number",
-                            "example": 3600
-                          }
-                        }
-                      }
+                        "type": "string"
+                      },
+                      "example": [
+                        "task A",
+                        "task B",
+                        "task C"
+                      ]
                     }
                   }
                 }
@@ -2108,7 +2098,7 @@
                     "items": {
                       "type": "number"
                     },
-                    "description": "Array of expected times for tasks in minutes",
+                    "description": "Array of expected times for tasks in seconds",
                     "example": [
                       120,
                       60,
@@ -2153,7 +2143,7 @@
                   },
                   "alg": {
                     "type": "integer",
-                    "description": "Algorithm ID (e.g., 1 for GA, 2 for GA_2, etc.)",
+                    "description": "Algorithm ID (e.g., 1 for GA, 2 for GA and Random, etc.)",
                     "example": 1
                   }
                 },
