@@ -3,6 +3,7 @@ import { db } from "./firebaseConfig.js";
 import { collection, getDocs } from 'firebase/firestore';
 
 export function runDueChecker() {
+  console.log('Due time checker started');
   async function getEndTimesGrouped(dueWindows = [3600]) {
     const tasksCol = collection(db, 'Task');
     const taskSnapshot = await getDocs(tasksCol);
@@ -74,10 +75,11 @@ cron.schedule('* * * * *', async () => {
         });
 
         const result = await response.json();
-        console.log('✅ Notification sent:', result);
+        console.log('Notification sent:', result);
       } catch (error) {
-        console.error('❌ Failed to send /due-notification:', error);
+        console.error('Failed to send /due-notification:', error);
       }
     }
   }
+})
 }

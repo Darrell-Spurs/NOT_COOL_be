@@ -6,6 +6,7 @@ import { doc, getDoc, updateDoc, collection, setDoc, getDocs, deleteDoc, query, 
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './swagger.js';
 import { spawn } from "child_process";
+import { runDueChecker } from './duetime_checker.js';
 import cors from 'cors';
 import os from 'os';
 import { get } from 'http';
@@ -33,9 +34,12 @@ function getLocalIP() {
   return '127.0.0.1'; // fallback
 }
 
+
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+runDueChecker(); 
 
 app.get('/swagger.json', (req, res) => {
   res.setHeader('Content-Type', 'application/json');
