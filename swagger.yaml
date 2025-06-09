@@ -197,11 +197,11 @@
                   UserName: 
                     type: "string"
                     description: "Username for the new user"
-                    example: "john_doe"
+                    example: "Tester99"
                   Password: 
                     type: "string"
                     description: "Password for the new user"
-                    example: "j0hNn_dO3"
+                    example: "999aBcD"
                 required: 
                   - "UserName"
                   - "Password"
@@ -219,7 +219,7 @@
                     UserID: 
                       type: "string"
                       description: "Auto-generated unique user ID"
-                      example: "user_123456789"
+                      example: "93p1cF7Mh2j5uOmfoGUX"
           400: 
             description: "Bad request - missing UserName"
             content: 
@@ -246,42 +246,6 @@
                     error: 
                       type: "string"
                       example: "Database connection failed"
-    /users/{userID}: 
-      put: 
-        tags: 
-          - "Users"
-        summary: "Update a user's information"
-        description: "Updates only the Arrange or UserName fields for a given user."
-        parameters: 
-          - 
-            in: "path"
-            name: "userID"
-            required: true
-            schema: 
-              type: "string"
-            description: "The ID of the user to update"
-        requestBody: 
-          required: true
-          content: 
-            application/json: 
-              schema: 
-                type: "object"
-                properties: 
-                  Arrange: 
-                    type: "integer"
-                    example: 1
-                  UserName: 
-                    type: "string"
-                    example: "Alice"
-        responses: 
-          200: 
-            description: "User updated successfully"
-          400: 
-            description: "Invalid or missing fields"
-          404: 
-            description: "User not found"
-          500: 
-            description: "Server error"
     /login: 
       post: 
         summary: "Authenticate user"
@@ -299,15 +263,180 @@
                 properties: 
                   UserID: 
                     type: "string"
+                    example: "MI51nEam3GgPqbV7WQeP"
                   Password: 
                     type: "string"
+                    example: "0000"
+        responses: 
+          201: 
+            description: "User created successfully"
+            content: 
+              application/json: 
+                schema: 
+                  type: "object"
+                  properties: 
+                    success: 
+                      type: "boolean"
+                      example: true
+          400: 
+            description: "Bad request - missing UserName"
+            content: 
+              application/json: 
+                schema: 
+                  type: "object"
+                  properties: 
+                    success: 
+                      type: "boolean"
+                      example: false
+                    message: 
+                      type: "string"
+                      example: "UserName and Password does not match"
+          500: 
+            description: "Internal server error"
+            content: 
+              application/json: 
+                schema: 
+                  type: "object"
+                  properties: 
+                    success: 
+                      type: "boolean"
+                      example: false
+                    error: 
+                      type: "string"
+                      example: "Database connection failed"
+    /users/by-username/{username}: 
+      get: 
+        tags: 
+          - "Users"
+        summary: "Get userID by username"
+        parameters: 
+          - 
+            in: "path"
+            name: "username"
+            schema: 
+              type: "string"
+            required: true
+            description: "Username to search for"
+            example: "Tester1"
         responses: 
           200: 
-            description: "Login successful"
-          401: 
-            description: "Invalid credentials"
+            description: "UserID found successfully"
+            content: 
+              application/json: 
+                schema: 
+                  type: "object"
+                  properties: 
+                    success: 
+                      type: "boolean"
+                      example: true
+                    UserID: 
+                      type: "string"
+                      description: "The user's unique ID"
+                      example: "93p1cF7Mh2j5uOmfoGUX"
           404: 
             description: "User not found"
+            content: 
+              application/json: 
+                schema: 
+                  type: "object"
+                  properties: 
+                    success: 
+                      type: "boolean"
+                      example: false
+                    message: 
+                      type: "string"
+                      example: "User Tester99 Not Found."
+          500: 
+            description: "Internal server error"
+            content: 
+              application/json: 
+                schema: 
+                  type: "object"
+                  properties: 
+                    success: 
+                      type: "boolean"
+                      example: false
+                    error: 
+                      type: "string"
+                      example: "Database query failed"
+    /users/{userID}: 
+      put: 
+        tags: 
+          - "Users"
+        summary: "Update a user's information"
+        description: "Updates only the Arrange or UserName fields for a given user."
+        parameters: 
+          - 
+            in: "path"
+            name: "userID"
+            required: true
+            schema: 
+              type: "string"
+              example: "MI51nEam3GgPqbV7WQeP"
+            description: "The ID of the user to update"
+        requestBody: 
+          required: true
+          content: 
+            application/json: 
+              schema: 
+                type: "object"
+                properties: 
+                  Arrange: 
+                    type: "integer"
+                    example: 1
+                  UserName: 
+                    type: "string"
+                    example: "Tester111"
+        responses: 
+          200: 
+            description: "User updated successfully"
+            content: 
+              application/json: 
+                schema: 
+                  type: "object"
+                  properties: 
+                    success: 
+                      type: "boolean"
+                      example: true
+          400: 
+            description: "Invalid or missing fields"
+            content: 
+              application/json: 
+                schema: 
+                  type: "object"
+                  properties: 
+                    success: 
+                      type: "boolean"
+                      example: false
+                    message: 
+                      type: "string"
+                      example: "Invalid or missing fields"
+          404: 
+            description: "User not found"
+            content: 
+              application/json: 
+                schema: 
+                  type: "object"
+                  properties: 
+                    success: 
+                      type: "boolean"
+                      example: false
+                    message: 
+                      type: "string"
+                      example: "User not Tester99 found"
+          500: 
+            description: "Server error"
+            content: 
+              application/json: 
+                schema: 
+                  type: "object"
+                  properties: 
+                    success: 
+                      type: "boolean"
+                      example: false
+                    error: 
+                      type: "string"
+                      example: "Database connection failed"
     /tasks: 
       post: 
         tags: 
@@ -323,15 +452,15 @@
                   UserID: 
                     type: "string"
                     description: "ID of the user creating the task"
-                    example: "user_123456789"
+                    example: "MI51nEam3GgPqbV7WQeP"
                   TaskName: 
                     type: "string"
                     description: "Name of the task"
-                    example: "Complete project report"
+                    example: "Frontend"
                   TaskDetail: 
                     type: "string"
                     description: "Detailed description of the task"
-                    example: "Write a comprehensive report on the project findings"
+                    example: "Complete frontend design and development"
                   EndTime: 
                     type: "string"
                     format: "date-time"
@@ -344,11 +473,11 @@
                   Penalty: 
                     type: "number"
                     description: "Penalty score for late completion (default 0)"
-                    example: 10
+                    example: 8
                   ExpectedTime: 
                     type: "number"
                     description: "Expected time to complete in minutes (default 60)"
-                    example: 120
+                    example: 600
                 required: 
                   - "UserID"
                   - "TaskName"
@@ -438,6 +567,17 @@
                       example: "Task not found"
           500: 
             description: "Internal server error"
+            content: 
+              application/json: 
+                schema: 
+                  type: "object"
+                  properties: 
+                    success: 
+                      type: "boolean"
+                      example: false
+                    error: 
+                      type: "string"
+                      example: "Database connection failed"
       put: 
         tags: 
           - "Tasks"
@@ -475,61 +615,6 @@
             description: "Invalid fields in request"
           500: 
             description: "Server error"
-    /users/by-username/{username}: 
-      get: 
-        tags: 
-          - "Users"
-        summary: "Get user ID by username"
-        parameters: 
-          - 
-            in: "path"
-            name: "username"
-            schema: 
-              type: "string"
-            required: true
-            description: "Username to search for"
-            example: "john_doe"
-        responses: 
-          200: 
-            description: "UserID found successfully"
-            content: 
-              application/json: 
-                schema: 
-                  type: "object"
-                  properties: 
-                    success: 
-                      type: "boolean"
-                      example: true
-                    UserID: 
-                      type: "string"
-                      description: "The user's unique ID"
-                      example: "user_123456789"
-          404: 
-            description: "User not found"
-            content: 
-              application/json: 
-                schema: 
-                  type: "object"
-                  properties: 
-                    success: 
-                      type: "boolean"
-                      example: false
-                    message: 
-                      type: "string"
-                      example: "User john_doe Not Found."
-          500: 
-            description: "Internal server error"
-            content: 
-              application/json: 
-                schema: 
-                  type: "object"
-                  properties: 
-                    success: 
-                      type: "boolean"
-                      example: false
-                    error: 
-                      type: "string"
-                      example: "Database query failed"
     /users/{userID}/arrange: 
       get: 
         tags: 
@@ -543,6 +628,7 @@
             required: true
             schema: 
               type: "string"
+              example: "MI51nEam3GgPqbV7WQeP"
             description: "The ID of the user to query"
         responses: 
           200: 
@@ -562,8 +648,30 @@
                       nullable: true
           404: 
             description: "User not found"
+            content: 
+              application/json: 
+                schema: 
+                  type: "object"
+                  properties: 
+                    success: 
+                      type: "boolean"
+                      example: false
+                    message: 
+                      type: "string"
+                      example: "User not found"
           500: 
-            description: "Server error"
+            description: "Internal server error"
+            content: 
+              application/json: 
+                schema: 
+                  type: "object"
+                  properties: 
+                    success: 
+                      type: "boolean"
+                      example: false
+                    error: 
+                      type: "string"
+                      example: "Database connection failed"
     /users/{userID}/tasks/root: 
       get: 
         tags: 

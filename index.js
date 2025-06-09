@@ -355,11 +355,11 @@ app.post('/notifications/due', async (req, res) => {
  *               UserName:
  *                 type: string
  *                 description: Username for the new user
- *                 example: "john_doe"
+ *                 example: "Tester99"
  *               Password:
  *                 type: string
  *                 description: Password for the new user
- *                 example: "j0hNn_dO3"
+ *                 example: "999aBcD$f"
  *             required:
  *               - UserName
  *               - Password
@@ -377,7 +377,7 @@ app.post('/notifications/due', async (req, res) => {
  *                 UserID:
  *                   type: string
  *                   description: Auto-generated unique user ID
- *                   example: "user_123456789"
+ *                   example: "aaa111bcd234"
  *       400:
  *         description: Bad request - missing UserName
  *         content:
@@ -460,7 +460,7 @@ app.post('/users', async (req, res) => {
  *                 example: 1
  *               UserName:
  *                 type: string
- *                 example: "Alice"
+ *                 example: "Tester1"
  *     responses:
  *       200:
  *         description: User updated successfully

@@ -12,6 +12,15 @@
     }
   ],
   "paths": {
+    "0": {
+      "0": "/"
+    },
+    "1": {
+      "0": "*"
+    },
+    "2": {
+      "0": "*"
+    },
     "/tokens/push": {
       "post": {
         "tags": [
@@ -297,12 +306,12 @@
                   "UserName": {
                     "type": "string",
                     "description": "Username for the new user",
-                    "example": "john_doe"
+                    "example": "Tester99"
                   },
                   "Password": {
                     "type": "string",
                     "description": "Password for the new user",
-                    "example": "j0hNn_dO3"
+                    "example": "999aBcD$f"
                   }
                 },
                 "required": [
@@ -328,7 +337,7 @@
                     "UserID": {
                       "type": "string",
                       "description": "Auto-generated unique user ID",
-                      "example": "user_123456789"
+                      "example": "aaa111bcd234"
                     }
                   }
                 }
@@ -409,7 +418,7 @@
                   },
                   "UserName": {
                     "type": "string",
-                    "example": "Alice"
+                    "example": "Tester1"
                   }
                 }
               }
