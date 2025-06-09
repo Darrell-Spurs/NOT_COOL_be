@@ -2358,20 +2358,10 @@ app.post('/tasks/:taskID/members', async (req, res) => {
  *                   example: true
  *                 result:
  *                   type: array
- *                   description: Schedule result from Python script
- *                   items:
- *                     type: object
- *                     properties:
- *                       TaskID:
- *                         type: string
- *                         example: "abc123"
- *                       StartTime:
- *                         type: string
- *                         format: date-time
- *                         example: "2025-06-01T12:00:00Z"
- *                       Duration:
- *                         type: number
- *                         example: 3600
+ *                   description: "Schedule result from Python script"
+ *                   items: 
+ *                    type: string
+ *                   example: ["task A", "task B", "task C"]
  *       500:
  *         description: Internal server error
  *         content:
